@@ -86,7 +86,14 @@ for (const p of PEERS) if (!allDeps[specName(p)]) toInstall.push(p);
 if (toInstall.length === 0) {
   ok('all deps already present');
 } else {
-  const addCmd = { pnpm: 'pnpm add', npm: 'npm install', yarn: 'yarn add', bun: 'bun add' }[pm];
+  // npm enforces peer deps strictly; fumadocs-core (react-router 7) vs tinacms
+  // (react-router 6) ERESOLVEs, so the npm path needs --legacy-peer-deps.
+  const addCmd = {
+    pnpm: 'pnpm add',
+    npm: 'npm install --legacy-peer-deps',
+    yarn: 'yarn add',
+    bun: 'bun add',
+  }[pm];
   try {
     execSync(`${addCmd} ${toInstall.join(' ')}`, { cwd: CWD, stdio: 'inherit' });
     ok(`installed ${toInstall.length} package(s)`);

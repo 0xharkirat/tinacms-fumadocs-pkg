@@ -11,8 +11,10 @@ Add **TinaCMS** visual editing to a **Fumadocs** (Next.js App Router) site **wit
 In an existing Fumadocs site that has already run `npx @tinacms/cli init`:
 
 ```bash
-npx github:0xharkirat/tinacms-fumadocs-pkg init
+pnpm dlx github:0xharkirat/tinacms-fumadocs-pkg init
 ```
+
+> Use `pnpm dlx`, not `npx`. npm's strict peer resolution rejects the fetch (`fumadocs-core` wants `react-router` 7, `tinacms` brings 6); pnpm is lenient. On an npm project: `npm_config_legacy_peer_deps=true npx github:0xharkirat/tinacms-fumadocs-pkg init`.
 
 It installs the adapter plus its 3 peer deps, writes the wired docs page and the keystroke-live island route (backing up any existing page to `.orig`), patches `next.config` and (for `src/` projects) the `tsconfig` `@tina/*` alias, then prints the one content-model edit to paste into `tina/config.ts`. Then run `pnpm dev` and open `/admin`.
 
