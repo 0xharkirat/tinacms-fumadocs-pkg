@@ -64,11 +64,18 @@ const Folder: Template = {
   fields: [
     { name: 'name', label: 'Name', type: 'string' },
     { name: 'defaultOpen', label: 'Open by default', type: 'boolean' },
-    // Note: nested folders aren't self-referenced (Tina templates can't
-    // recurse inline); only files are editable one level deep for now.
+    // Files here; nested folders are wired in below (templates can't reference
+    // themselves inline, so the self-reference is added after Folder exists).
     { name: 'children', label: 'Files', type: 'rich-text', templates: [FileItem] },
   ],
 };
+
+// Recursive file trees: a folder holds files AND nested folders. Add the
+// self-reference now that `Folder` is defined, so `Folder.children` accepts both
+// `File` and `Folder` (any depth) in the editor.
+(Folder.fields.find((f) => f.name === 'children') as { templates: Template[] }).templates.push(
+  Folder,
+);
 
 // --- top-level components (usable directly in the doc body) ---
 
@@ -81,8 +88,8 @@ const Callout: Template = {
       name: 'type',
       label: 'Type',
       type: 'string',
-      // Verify option values against your installed fumadocs-ui version.
-      options: ['info', 'warn', 'error', 'success'],
+      // fumadocs-ui CalloutType (v16). Verify against your installed version.
+      options: ['info', 'warn', 'warning', 'error', 'success', 'idea'],
     },
     { name: 'children', label: 'Content', type: 'rich-text' },
   ],
@@ -112,7 +119,18 @@ const Steps: Template = {
 const Accordions: Template = {
   name: 'Accordions',
   label: 'Accordions',
-  fields: [{ name: 'children', label: 'Accordions', type: 'rich-text', templates: [Accordion] }],
+  fields: [
+    {
+      // Required by Fumadocs/Radix. "single" = one open at a time, "multiple" =
+      // any number. WITHOUT this field, parsing <Accordions type="…"> fails with
+      // "Unable to parse rich-text".
+      name: 'type',
+      label: 'Type',
+      type: 'string',
+      options: ['single', 'multiple'],
+    },
+    { name: 'children', label: 'Accordions', type: 'rich-text', templates: [Accordion] },
+  ],
 };
 
 const Files: Template = {
