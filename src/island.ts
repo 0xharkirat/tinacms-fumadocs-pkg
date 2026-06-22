@@ -180,8 +180,11 @@ export function createTinaIslandRoute(opts: TinaIslandRouteOptions) {
       overlay = {};
     }
 
-    const doc = pickOverlayDoc(overlay, collection);
-    const mdx = doc ? overlayBodyToMDX(doc.body, templates) : null;
+    // Select the overlay entry for THIS page. The bridge posts every opened
+    // doc's data, so "first entry" would preview a stale doc after navigation;
+    // page.path (e.g. "test.mdx") matches the doc's _sys.relativePath.
+    const picked = pickOverlayDoc(overlay, collection, page.path);
+    const mdx = picked ? overlayBodyToMDX(picked.doc.body, templates) : null;
     // Fall back to on-disk content for the first frame (before the admin posts),
     // stripping frontmatter so it doesn't render as an <hr> + stray heading.
     const source =
@@ -195,10 +198,10 @@ export function createTinaIslandRoute(opts: TinaIslandRouteOptions) {
     );
 
     // The bridge copies data-tina-* attrs off the returned wrapper, so re-emit
-    // the body field marker or click-to-edit is lost after the first swap.
-    const formId = Object.keys(overlay)[0];
-    const field = formId
-      ? ` data-tina-field="${escapeAttr(`${formId}---${collection}.body`)}"`
+    // the body field marker. Key it off the CHOSEN doc's query id (not the first
+    // overlay entry) or click-to-edit binds to the wrong doc after navigation.
+    const field = picked
+      ? ` data-tina-field="${escapeAttr(`${picked.queryId}---${collection}.body`)}"`
       : '';
     return html(`<div data-tina-island-body${field}>${bodyHtml}</div>`);
   }

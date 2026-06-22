@@ -73,27 +73,65 @@ export interface OverlayDoc {
   body?: unknown; // Tina rich-text AST
 }
 
+export interface PickedOverlay {
+  /** This page's doc (title + rich-text body) pulled from the overlay. */
+  doc: OverlayDoc;
+  /**
+   * The bridge query id this doc was keyed under (e.g. "27woxo"). The island
+   * route re-emits it as `data-tina-field` so click-to-edit on the body binds
+   * to the RIGHT doc after the innerHTML swap.
+   */
+  queryId: string;
+}
+
 /**
- * Pull this page's doc out of the bridge overlay payload (`{ [formId]: data }`),
- * accepting both the GraphQL shape `{ <collection>: {...} }` and a flat `{...}`.
+ * Pull THIS page's doc out of the bridge overlay payload.
+ *
+ * Shape: `{ [queryId]: { <collection>: {…doc…} } }` (also tolerates a flat
+ * `{…doc…}`). CRITICAL: @tinacms/bridge ACCUMULATES every form opened this
+ * session, so after navigating index -> test the overlay carries BOTH docs. We
+ * must select the entry whose doc matches the page being previewed (`matchPath`,
+ * the content-relative path like "test.mdx") — taking "the first entry" renders
+ * the wrong, stale doc once more than one has been opened (the navigation
+ * preview bug). When a matchPath is given but nothing matches, return null so
+ * the caller falls back to THIS page's on-disk content (never another doc's).
  */
 export function pickOverlayDoc(
   overlay: Record<string, unknown>,
   collection = 'docs',
-  formId?: string,
-): OverlayDoc | null {
-  const entries = Object.entries(overlay);
+  matchPath?: string,
+): PickedOverlay | null {
+  const entries = Object.entries(overlay).filter(
+    ([, v]) => !!v && typeof v === 'object',
+  );
   if (entries.length === 0) return null;
-  const chosen =
-    (formId && overlay[formId]) ??
-    entries.map(([, v]) => v).find((v) => !!v && typeof v === 'object');
-  if (!chosen || typeof chosen !== 'object') return null;
-  const node = chosen as Record<string, unknown>;
-  const doc = (node[collection] ?? node) as Record<string, unknown>;
+
+  const docOf = (v: unknown): Record<string, unknown> => {
+    const node = v as Record<string, unknown>;
+    return (node[collection] ?? node) as Record<string, unknown>;
+  };
+  // Match on the doc's own path metadata (_sys.relativePath, or id) — which the
+  // GraphQL overlay always carries — against the page being previewed.
+  const matchesPage = ([, v]: [string, unknown]): boolean => {
+    const d = docOf(v);
+    const rel = (d?._sys as { relativePath?: string } | undefined)?.relativePath;
+    const id = typeof d?.id === 'string' ? d.id : undefined;
+    return rel === matchPath || id === matchPath || !!id?.endsWith(`/${matchPath}`);
+  };
+
+  // With a matchPath, accept ONLY the matching entry (else null -> on-disk
+  // fallback in the caller). Without one, keep the legacy "first doc" behaviour.
+  const chosenEntry = matchPath ? entries.find(matchesPage) ?? null : entries[0];
+  if (!chosenEntry) return null;
+  const [queryId, chosen] = chosenEntry;
+  const doc = docOf(chosen);
   if (!doc || typeof doc !== 'object') return null;
   return {
-    title: typeof doc.title === 'string' ? doc.title : undefined,
-    body: doc.body,
+    queryId,
+    doc: {
+      title: typeof doc.title === 'string' ? doc.title : undefined,
+      body: doc.body,
+    },
   };
 }
 
