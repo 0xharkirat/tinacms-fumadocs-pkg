@@ -1,5 +1,5 @@
 {
-  "name": "fumadocs-tinacms",
+  "name": "tinacms-fumadocs-pkg",
   "version": "0.0.0",
   "description": "Add TinaCMS visual/contextual editing to a Fumadocs (Next.js App Router) site without reimplementing Fumadocs' renderer.",
   "type": "module",

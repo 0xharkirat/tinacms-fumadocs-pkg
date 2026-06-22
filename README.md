@@ -1,4 +1,4 @@
-# fumadocs-tinacms
+# tinacms-fumadocs-pkg
 
 Add **TinaCMS** visual editing to a **Fumadocs** (Next.js App Router) site **without reimplementing Fumadocs' renderer**. The `.mdx` file on disk is the only contract: TinaCMS edits it, Fumadocs compiles it.
 
@@ -15,13 +15,13 @@ A Fumadocs **Next.js App Router** site that has already run `npx @tinacms/cli in
 ## Install
 
 ```bash
-pnpm add @tinacms/bridge @mdx-js/mdx @tinacms/mdx fumadocs-tinacms
+pnpm add @tinacms/bridge @mdx-js/mdx @tinacms/mdx tinacms-fumadocs-pkg
 ```
 
 `next.config.mjs` (transpile the adapter's source):
 
 ```js
-export default { transpilePackages: ['fumadocs-tinacms'] };
+export default { transpilePackages: ['tinacms-fumadocs-pkg'] };
 ```
 
 ## Wire it (4 steps)
@@ -31,7 +31,7 @@ export default { transpilePackages: ['fumadocs-tinacms'] };
 Model the `docs` collection and spread the stock-component templates. Import from the **`/templates` subpath** so the Tina config build never pulls in the client bridge:
 
 ```ts
-import { fumadocsTemplates } from 'fumadocs-tinacms/templates';
+import { fumadocsTemplates } from 'tinacms-fumadocs-pkg/templates';
 
 // inside the `docs` collection:
 ui: {
@@ -51,9 +51,9 @@ fields: [
 Fetch the doc via your generated client, stamp `tinaField` markers, inject the form payload, mount the bridge, and wrap the body in `<TinaIslandBody>` (the React-uncontrolled live container). The body itself still renders through Fumadocs' `<MDX>`. See the demo repo ([tinacms-fumadocs-poc](https://github.com/0xharkirat/tinacms-fumadocs-poc/blob/main/app/docs/%5B%5B...slug%5D%5D/page.tsx)) for the complete, working `page.tsx`; the essentials:
 
 ```tsx
-import { prepareTinaForm, withTinaMarkers, TinaEditBridge, TinaIslandBody } from 'fumadocs-tinacms';
-import { tinaIslandUrl, getIslandSeedHtml } from 'fumadocs-tinacms/island';
-import { previewComponents } from 'fumadocs-tinacms/preview';
+import { prepareTinaForm, withTinaMarkers, TinaEditBridge, TinaIslandBody } from 'tinacms-fumadocs-pkg';
+import { tinaIslandUrl, getIslandSeedHtml } from 'tinacms-fumadocs-pkg/island';
+import { previewComponents } from 'tinacms-fumadocs-pkg/preview';
 
 const tina = await client.queries
   .docs({ relativePath: page.path }, { fetchOptions: { cache: 'no-store' } })
@@ -73,8 +73,8 @@ const seed = islandUrl
 10 lines via the factory. **Supply `authorize` for production** (see *Security*):
 
 ```ts
-import { createTinaIslandRoute } from 'fumadocs-tinacms/island';
-import { previewComponents } from 'fumadocs-tinacms/preview';
+import { createTinaIslandRoute } from 'tinacms-fumadocs-pkg/island';
+import { previewComponents } from 'tinacms-fumadocs-pkg/preview';
 import { source } from '@/lib/source';
 import { getMDXComponents } from '@/components/mdx';
 import { client } from '@/tina/__generated__/client';
@@ -114,10 +114,10 @@ The island route compiles the **untrusted** posted overlay through `@mdx-js/mdx`
 | `TinaEditBridge` | client: mounts `@tinacms/bridge`; live title patch + nav re-scan |
 | `TinaIslandBody` | client: React-uncontrolled live body container (key-remounts on save) |
 | `withTinaMarkers(components, bodyField)` | adds `data-tina-field` to a Fumadocs MDX map |
-| `fumadocs-tinacms/templates` → `fumadocsTemplates` | Tina templates for stock Fumadocs components |
-| `fumadocs-tinacms/island` → `createTinaIslandRoute`, `tinaIslandUrl`, `getIslandSeedHtml` | the island endpoint + helpers |
-| `fumadocs-tinacms/preview` → `previewComponents` | preview-safe component map (markdown live, UI components → placeholders) |
-| `fumadocs-tinacms/runtime` → `compileFumadocsMDX` | runtime Fumadocs MDX compile (used by the island) |
+| `tinacms-fumadocs-pkg/templates` → `fumadocsTemplates` | Tina templates for stock Fumadocs components |
+| `tinacms-fumadocs-pkg/island` → `createTinaIslandRoute`, `tinaIslandUrl`, `getIslandSeedHtml` | the island endpoint + helpers |
+| `tinacms-fumadocs-pkg/preview` → `previewComponents` | preview-safe component map (markdown live, UI components → placeholders) |
+| `tinacms-fumadocs-pkg/runtime` → `compileFumadocsMDX` | runtime Fumadocs MDX compile (used by the island) |
 
 ## Limitations
 
