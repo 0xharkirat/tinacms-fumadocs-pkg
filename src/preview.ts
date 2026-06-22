@@ -33,12 +33,31 @@ const tag =
   ({ children, ...rest }: Props) =>
     createElement(name, rest, children);
 
-// Fenced code: Fumadocs' rehypeCode stamps `icon` (the language-icon SVG) onto
-// <pre> for its CLIENT <CodeBlock> to render. We emit a plain <pre>, so that raw
-// SVG would leak as a DOM attribute. Drop it; Shiki highlighting is already baked
-// into the children and fumadocs' `.shiki` CSS styles the block.
-const codePre = ({ children, icon: _icon, ...rest }: Props) =>
-  createElement('pre', rest, children);
+// Fenced code. The published page renders Fumadocs' CLIENT <CodeBlock>: a
+// full-width `bg-fd-card` figure frame (border, radius, shadow) wrapping a
+// transparent <pre>, plus a copy button. The server preview can't run that
+// client component, so the bare Shiki <pre> alone looked like a narrow box. We
+// rebuild the SAME figure frame here so the preview matches the site; the <pre>
+// keeps its `.shiki` classes (syntax colors) but goes transparent so the card
+// shows through. `icon` (the language-icon SVG the client CodeBlock consumes) is
+// dropped, else it leaks as a raw attribute. Only the copy button is missing,
+// because it's a client-only interaction.
+const codePre = ({ children, icon: _icon, style, ...rest }: Props) =>
+  createElement(
+    'figure',
+    {
+      'data-tina-preview-codeblock': '',
+      className: 'not-prose my-4 overflow-x-auto rounded-xl border bg-fd-card text-sm shadow-sm',
+    },
+    createElement(
+      'pre',
+      {
+        ...rest,
+        style: { ...(style as CSSProperties), margin: 0, padding: '0.75rem 1rem', background: 'transparent' },
+      },
+      children,
+    ),
+  );
 
 // ── honest "renders on your site" placeholder for Fumadocs UI components ──────────
 // React wants `style` as an object, not a CSS string — author them as objects.
