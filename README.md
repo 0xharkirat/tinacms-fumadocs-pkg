@@ -36,7 +36,7 @@ pnpm add @tinacms/bridge @mdx-js/mdx @tinacms/mdx tinacms-fumadocs-pkg
 export default { transpilePackages: ['tinacms-fumadocs-pkg'] };
 ```
 
-## Wire it (4 steps)
+## Wire it (5 steps)
 
 ### 1. Schema: `tina/config.ts`
 
@@ -63,7 +63,20 @@ fields: [
 ],
 ```
 
-### 2. Docs page: `app/docs/[[...slug]]/page.tsx`
+### 2. Components map: `components/mdx.tsx`
+
+Spread `fumadocsComponents` into `getMDXComponents` so everything the editor's Embed menu can insert also **renders** on the page. Fumadocs' default map ships `Callout`/`Card`/`Cards`/`Tabs` but **not** `Steps`/`Accordions`/`Files`, which otherwise throw `Expected component … to be defined`:
+
+```ts
+import defaultMdxComponents from 'fumadocs-ui/mdx';
+import { fumadocsComponents } from 'tinacms-fumadocs-pkg/components';
+
+export function getMDXComponents(components) {
+  return { ...defaultMdxComponents, ...fumadocsComponents, ...components };
+}
+```
+
+### 3. Docs page: `app/docs/[[...slug]]/page.tsx`
 
 Fetch the doc via your generated client, stamp `tinaField` markers, inject the form payload, mount the bridge, and wrap the body in `<TinaIslandBody>` (the React-uncontrolled live container). The body itself still renders through Fumadocs' `<MDX>`. See the demo repo ([tinacms-fumadocs-poc](https://github.com/0xharkirat/tinacms-fumadocs-poc/blob/main/app/docs/%5B%5B...slug%5D%5D/page.tsx)) for the complete, working `page.tsx`; the essentials:
 
@@ -85,7 +98,7 @@ const seed = islandUrl
 // <TinaIslandBody islandUrl initialHtml={seed} remountKey={hash} ...><MDX/></TinaIslandBody>
 ```
 
-### 3. Island route: `app/api/tina-island/docs/[[...slug]]/route.ts`
+### 4. Island route: `app/api/tina-island/docs/[[...slug]]/route.ts`
 
 10 lines via the factory. **Supply `authorize` for production** (see *Security*):
 
@@ -108,7 +121,7 @@ export const { POST } = createTinaIslandRoute({
 });
 ```
 
-### 4. Build script: `package.json`
+### 5. Build script: `package.json`
 
 Generate the Tina client during the build, or a clean clone's `next build` fails on the gitignored `tina/__generated__`:
 
@@ -131,7 +144,8 @@ The island route compiles the **untrusted** posted overlay through `@mdx-js/mdx`
 | `TinaEditBridge` | client: mounts `@tinacms/bridge`; live title patch + nav re-scan |
 | `TinaIslandBody` | client: React-uncontrolled live body container (key-remounts on save) |
 | `withTinaMarkers(components, bodyField)` | adds `data-tina-field` to a Fumadocs MDX map |
-| `tinacms-fumadocs-pkg/templates` → `fumadocsTemplates` | Tina templates for stock Fumadocs components |
+| `tinacms-fumadocs-pkg/templates` → `fumadocsTemplates` | Tina templates for stock Fumadocs components (the editor's Embed menu) |
+| `tinacms-fumadocs-pkg/components` → `fumadocsComponents` | the matching render components, spread into `getMDXComponents` |
 | `tinacms-fumadocs-pkg/island` → `createTinaIslandRoute`, `tinaIslandUrl`, `getIslandSeedHtml` | the island endpoint + helpers |
 | `tinacms-fumadocs-pkg/preview` → `previewComponents` | preview-safe component map (markdown live, UI components → placeholders) |
 | `tinacms-fumadocs-pkg/runtime` → `compileFumadocsMDX` | runtime Fumadocs MDX compile (used by the island) |
