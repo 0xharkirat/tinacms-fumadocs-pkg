@@ -212,6 +212,11 @@ console.log(`
     path: 'content/docs',
     format: 'mdx',
     ui: {
+      // new docs -> lowercase kebab-case filename + route from the title
+      filename: {
+        slugify: (values) =>
+          String(values?.title ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled',
+      },
       router: ({ document }) => {
         const slug = document._sys.relativePath.replace(/\\.mdx?$/, '');
         return slug === 'index' ? '/docs' : \`/docs/\${slug}\`;
