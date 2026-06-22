@@ -29,9 +29,15 @@ let optionsPromise: Promise<ProcessorOptions> | null = null;
 async function getOptions(): Promise<ProcessorOptions> {
   if (!optionsPromise) {
     const { mdxPreset } = await import('fumadocs-core/content/mdx/preset-runtime');
-    // Pass the same mdxOptions you'd use in source.config.ts (e.g.
-    // remarkAutoTypeTable from fumadocs-typescript) to match production exactly.
-    optionsPromise = mdxPreset({});
+    // PREVIEW-SAFE overrides — this compiles the editor's overlay STRING at
+    // request time (no file on disk, no bundler), unlike the production build:
+    //   remarkImageOptions:false — Fumadocs' image plugin rewrites images into
+    //   imports that need the VFile's `dirname` + a bundler to resolve. A string
+    //   overlay has neither, so ANY image throws "specify dirname". Disabled,
+    //   images stay plain <img src> and preview fine; production keeps imports.
+    // (Forward your source.config mdxOptions here too, e.g. remarkAutoTypeTable,
+    // to match production for constructs that DO compile from a string.)
+    optionsPromise = mdxPreset({ remarkImageOptions: false });
   }
   return optionsPromise;
 }

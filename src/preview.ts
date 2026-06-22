@@ -33,6 +33,13 @@ const tag =
   ({ children, ...rest }: Props) =>
     createElement(name, rest, children);
 
+// Fenced code: Fumadocs' rehypeCode stamps `icon` (the language-icon SVG) onto
+// <pre> for its CLIENT <CodeBlock> to render. We emit a plain <pre>, so that raw
+// SVG would leak as a DOM attribute. Drop it; Shiki highlighting is already baked
+// into the children and fumadocs' `.shiki` CSS styles the block.
+const codePre = ({ children, icon: _icon, ...rest }: Props) =>
+  createElement('pre', rest, children);
+
 // ── honest "renders on your site" placeholder for Fumadocs UI components ──────────
 // React wants `style` as an object, not a CSS string — author them as objects.
 
@@ -127,7 +134,7 @@ export function previewComponents(base: MDXComponents): MDXComponents {
     em: tag('em'),
     del: tag('del'),
     code: tag('code'), // inline code; fenced code is <pre><code> w/ baked Shiki
-    pre: tag('pre'),
+    pre: codePre, // fenced code; strips the leaked `icon` SVG attr
     hr: tag('hr'),
     img: tag('img'),
     table: tag('table'),
