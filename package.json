@@ -12,7 +12,8 @@
     "./templates": "./src/templates.ts",
     "./runtime": "./src/runtime.ts",
     "./island": "./src/island.ts",
-    "./preview": "./src/preview.ts"
+    "./preview": "./src/preview.ts",
+    "./components": "./src/components.ts"
   },
   "files": [
     "src",

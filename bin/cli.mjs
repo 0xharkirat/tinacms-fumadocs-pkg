@@ -160,14 +160,15 @@ let configWired = false;
   }
   if (/transpilePackages\s*:/.test(src))
     return warn(`add "tinacms-fumadocs-pkg" to the existing transpilePackages in ${rel(f)}`);
-  // Inject after the first config-object opening we recognise: const config /
-  // nextConfig / any `const x = {`, an inline `export default {`, or a wrapped
-  // `export default withMDX({`.
+  // Inject after a config-object opening we recognise: const config / nextConfig
+  // (named, any position), an inline `export default {`, or a wrapped
+  // `export default withMDX({`. A non-standard config variable name falls through
+  // to the manual-step warning below: safer than a catch-all `const x = {` that
+  // could match an unrelated object earlier in the file.
   const opener = [
     /\bconst\s+(?:config|nextConfig)\b[^=]*=\s*\{/,
     /\bexport\s+default\s*\{/,
     /\bexport\s+default\s+\w+\(\s*\{/,
-    /\bconst\s+\w+\s*(?::\s*[\w.]+)?\s*=\s*\{/,
   ].find((re) => re.test(src));
   if (!opener)
     return warn(`could not auto-edit ${rel(f)}. Add: transpilePackages: ["tinacms-fumadocs-pkg"]`);
@@ -248,19 +249,30 @@ console.log(`
     ],
   }`);
 
+console.log(`
+  Then make every Embed-menu component renderable. Fumadocs' default map lacks
+  Steps / Accordions / Files, so spread the adapter's matching components into
+  your getMDXComponents (e.g. components/mdx.tsx):
+
+  import { fumadocsComponents } from 'tinacms-fumadocs-pkg/components';
+  // return { ...defaultMdxComponents, ...fumadocsComponents, ...components };
+`);
+
 const dev = pkg.scripts?.dev || '';
 if (!/tinacms\s+dev/.test(dev))
   warn(`your "dev" script is \`${dev}\` — make it: "tinacms dev -c \\"next dev\\""`);
 
 // ── done ───────────────────────────────────────────────────────────────────
 if (configWired) {
-  console.log('\n\x1b[1m✓ Wired.\x1b[0m Next:');
+  console.log('\n\x1b[1m✓ Wired.\x1b[0m Two small edits, then run:');
   console.log('  1. paste the docs collection above into tina/config.ts (replace the sample)');
-  console.log(`  2. ${pm} run dev   →   http://localhost:3000/admin   → click a doc`);
+  console.log('  2. spread ...fumadocsComponents into your getMDXComponents (snippet above)');
+  console.log(`  3. ${pm} run dev   →   http://localhost:3000/admin   → click a doc`);
 } else {
-  console.log('\n\x1b[33m⚠ One required manual step. next.config was NOT patched:\x1b[0m');
+  console.log('\n\x1b[33m⚠ next.config was NOT patched. Do these, then run:\x1b[0m');
   console.log("  1. add  transpilePackages: ['tinacms-fumadocs-pkg']  to your next.config");
   console.log('     (the adapter ships TypeScript, so it MUST be transpiled or the build fails)');
   console.log('  2. paste the docs collection above into tina/config.ts');
-  console.log(`  3. then ${pm} run dev   →   http://localhost:3000/admin`);
+  console.log('  3. spread ...fumadocsComponents into your getMDXComponents (snippet above)');
+  console.log(`  4. then ${pm} run dev   →   http://localhost:3000/admin`);
 }
