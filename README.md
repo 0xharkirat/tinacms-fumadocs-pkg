@@ -6,7 +6,17 @@ Add **TinaCMS** visual editing to a **Fumadocs** (Next.js App Router) site **wit
 
 **What you don't (yet):** Fumadocs' `'use client'` UI components (`Card`, `Callout`, `Tabs`, `Steps`, `Accordions`, `Files`, …) can't be invoked by the server-side preview compile, so they show an honest, labelled placeholder in the editor and render for real on your published page. (Fully-live UI components need a non-RSC Fumadocs template; see *Limitations*.)
 
-> Status: workspace package in the PoC monorepo, not yet on npm. For now, clone the starter repo; the steps below document the integration for when it's published / vendored.
+## Quick start
+
+In an existing Fumadocs site that has already run `npx @tinacms/cli init`:
+
+```bash
+npx github:0xharkirat/tinacms-fumadocs-pkg init
+```
+
+It installs the adapter plus its 3 peer deps, writes the wired docs page and the keystroke-live island route (backing up any existing page to `.orig`), patches `next.config` and (for `src/` projects) the `tsconfig` `@tina/*` alias, then prints the one content-model edit to paste into `tina/config.ts`. Then run `pnpm dev` and open `/admin`.
+
+> Installable from GitHub today (`github:0xharkirat/tinacms-fumadocs-pkg`); not yet on npm. Want to wire it by hand, or see exactly what `init` does? The manual steps below are precisely what it automates.
 
 ## Prerequisites
 
