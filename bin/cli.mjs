@@ -4,9 +4,10 @@
 // One command to add TinaCMS contextual editing to an existing Fumadocs
 // (Next.js App Router) site. It installs the adapter + its peer deps, writes
 // the two Fumadocs-specific files (the wired docs page + the keystroke-live
-// island route), patches next.config / tsconfig, and prints the one schema
-// edit that's too project-specific to do safely. Zero runtime deps so it runs
-// straight from `npx github:…` with no build step.
+// island route), and patches everything else it can reach safely: next.config,
+// tsconfig, the tina/config.ts collection, the getMDXComponents map, and the
+// dev script. Anything it can't edit safely it prints for you to paste. Zero
+// runtime deps so it runs straight from `npx github:…` with no build step.
 import {
   existsSync,
   readFileSync,
@@ -27,6 +28,31 @@ const ADAPTER_SPEC = 'github:0xharkirat/tinacms-fumadocs-pkg';
 // Peer deps the adapter needs but create-fumadocs-app / `tinacms init` do NOT
 // install (singletons + version-coupled libs — see README "Why peer deps").
 const PEERS = ['@tinacms/bridge@^0.3.0', '@tinacms/mdx@^2', '@mdx-js/mdx@^3'];
+
+// The docs collection we inject into tina/config.ts (or print as a fallback).
+// Indented to sit inside `schema.collections: [ … ]`. Backticks / ${…} / the
+// regex dot are escaped so this template literal emits literal TS source.
+const DOCS_COLLECTION = `      {
+        name: 'docs',
+        label: 'Docs',
+        path: 'content/docs',
+        format: 'mdx',
+        ui: {
+          // new docs -> lowercase kebab-case filename (and route) from the title
+          filename: {
+            slugify: (values) =>
+              String(values?.title ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled',
+          },
+          router: ({ document }) => {
+            const slug = document._sys.relativePath.replace(/\\.mdx?$/, '');
+            return slug === 'index' ? '/docs' : \`/docs/\${slug}\`;
+          },
+        },
+        fields: [
+          { type: 'string', name: 'title', label: 'Title', isTitle: true, required: true },
+          { type: 'rich-text', name: 'body', label: 'Body', isBody: true, templates: [...fumadocsTemplates] },
+        ],
+      },`;
 
 // ── tiny logger ────────────────────────────────────────────────────────────
 const step = (m) => console.log(`\n\x1b[1m• ${m}\x1b[0m`);
@@ -72,7 +98,7 @@ if (!existsSync(appDir)) {
 if (!allDeps['fumadocs-core'])
   warn('fumadocs-core not found — is this a Fumadocs site? Continuing anyway.');
 if (!allDeps['tinacms'])
-  warn('tinacms not found — run `npx @tinacms/cli init` first for the Tina basics.');
+  warn('tinacms not found — run `pnpm dlx @tinacms/cli init` first for the Tina basics.');
 
 console.log(`  package manager: ${pm}   app dir: ${rel(appDir)}/`);
 
@@ -221,58 +247,121 @@ step('Gitignoring the Tina admin build (public/admin)');
   ok('added public/admin to .gitignore');
 })();
 
-// ── 7. the one manual edit: the content model ──────────────────────────────
-step('Last step — your content model (paste into tina/config.ts)');
-console.log(`
-  import { fumadocsTemplates } from 'tinacms-fumadocs-pkg/templates';
+// ── 7. tina/config.ts — the docs collection ────────────────────────────────
+// Replace Tina's sample collection with a Fumadocs `docs` collection. The
+// sample tina-init config is deterministic, so we add the import and rewrite
+// the contents of `collections: [ … ]` by bracket-matching. Anything unexpected
+// falls back to printing the block for a manual paste.
+step('Wiring the docs collection (tina/config.ts)');
+let collectionWired = false;
+try {
+  const f = join(CWD, 'tina', 'config.ts');
+  if (!existsSync(f)) {
+    warn('no tina/config.ts — run `pnpm dlx @tinacms/cli init` first, then re-run');
+  } else {
+    let src = readFileSync(f, 'utf8');
+    if (src.includes('fumadocsTemplates') || /["']content\/docs["']/.test(src)) {
+      collectionWired = true;
+      ok('tina/config.ts already has the docs collection');
+    } else {
+      const importLine = `import { fumadocsTemplates } from '${ADAPTER}/templates';\n`;
+      src = /from\s+["']tinacms["'];?\n/.test(src)
+        ? src.replace(/(from\s+["']tinacms["'];?\n)/, `$1${importLine}`)
+        : importLine + src;
+      // find `collections: [` and bracket-match to its closing `]`
+      const ci = src.indexOf('collections');
+      const open = ci >= 0 ? src.indexOf('[', ci) : -1;
+      let depth = 0;
+      let close = -1;
+      for (let i = open; open >= 0 && i < src.length; i++) {
+        if (src[i] === '[') depth++;
+        else if (src[i] === ']' && --depth === 0) {
+          close = i;
+          break;
+        }
+      }
+      if (close < 0) {
+        warn('could not find the collections array — paste the docs collection below into tina/config.ts');
+      } else {
+        src = `${src.slice(0, open + 1)}\n${DOCS_COLLECTION}\n    ${src.slice(close)}`;
+        writeFileSync(f, src);
+        collectionWired = true;
+        ok('added the docs collection (replaced the sample) in tina/config.ts');
+      }
+    }
+  }
+} catch {
+  warn('could not edit tina/config.ts — paste the docs collection below');
+}
 
-  // replace the sample collection with this one:
-  {
-    name: 'docs',
-    label: 'Docs',
-    path: 'content/docs',
-    format: 'mdx',
-    ui: {
-      // new docs -> lowercase kebab-case filename + route from the title
-      filename: {
-        slugify: (values) =>
-          String(values?.title ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled',
-      },
-      router: ({ document }) => {
-        const slug = document._sys.relativePath.replace(/\\.mdx?$/, '');
-        return slug === 'index' ? '/docs' : \`/docs/\${slug}\`;
-      },
-    },
-    fields: [
-      { type: 'string', name: 'title', label: 'Title', isTitle: true, required: true },
-      { type: 'rich-text', name: 'body', label: 'Body', isBody: true, templates: [...fumadocsTemplates] },
-    ],
-  }`);
+// ── 8. components/mdx.tsx — make every Embed component renderable ──────────
+// Fumadocs' default map omits Steps / Accordions / Files; spread our matching
+// components into getMDXComponents so inserted blocks render on the page.
+step('Wiring the render components (getMDXComponents)');
+let componentsWired = false;
+try {
+  const f = [
+    join(CWD, 'components', 'mdx.tsx'),
+    join(CWD, 'src', 'components', 'mdx.tsx'),
+    join(CWD, 'mdx-components.tsx'),
+    join(CWD, 'src', 'mdx-components.tsx'),
+  ].find(existsSync);
+  if (!f) {
+    warn('no components/mdx.tsx — spread ...fumadocsComponents into getMDXComponents (snippet below)');
+  } else {
+    let src = readFileSync(f, 'utf8');
+    if (src.includes('fumadocsComponents')) {
+      componentsWired = true;
+      ok(`${rel(f)} already spreads fumadocsComponents`);
+    } else if (!/\.\.\.defaultMdxComponents,/.test(src)) {
+      warn(`couldn't find ...defaultMdxComponents in ${rel(f)} — add ...fumadocsComponents (snippet below)`);
+    } else {
+      const importLine = `import { fumadocsComponents } from '${ADAPTER}/components';\n`;
+      src = /from\s+["']fumadocs-ui\/mdx["'];?\n/.test(src)
+        ? src.replace(/(from\s+["']fumadocs-ui\/mdx["'];?\n)/, `$1${importLine}`)
+        : importLine + src;
+      src = src.replace(/(\.\.\.defaultMdxComponents,)/, '$1\n    ...fumadocsComponents,');
+      writeFileSync(f, src);
+      componentsWired = true;
+      ok(`spread ...fumadocsComponents into ${rel(f)}`);
+    }
+  }
+} catch {
+  warn('could not edit components/mdx.tsx — add ...fumadocsComponents (snippet below)');
+}
 
-console.log(`
-  Then make every Embed-menu component renderable. Fumadocs' default map lacks
-  Steps / Accordions / Files, so spread the adapter's matching components into
-  your getMDXComponents (e.g. components/mdx.tsx):
-
-  import { fumadocsComponents } from 'tinacms-fumadocs-pkg/components';
-  // return { ...defaultMdxComponents, ...fumadocsComponents, ...components };
-`);
-
-const dev = pkg.scripts?.dev || '';
-if (!/tinacms\s+dev/.test(dev))
-  warn(`your "dev" script is \`${dev}\` — make it: "tinacms dev -c \\"next dev\\""`);
+// ── 9. package.json — wrap the dev script with tinacms dev ──────────────────
+step('Wrapping the dev script (tinacms dev)');
+(() => {
+  // re-read: step 1 (install) rewrote package.json with the new deps
+  const fresh = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+  const dev = fresh.scripts?.dev || '';
+  if (/tinacms\s+dev/.test(dev)) return ok('dev script already runs tinacms dev');
+  const inner = dev || 'next dev';
+  fresh.scripts ??= {};
+  fresh.scripts.dev = `tinacms dev -c "${inner}"`;
+  writeFileSync(pkgJsonPath, `${JSON.stringify(fresh, null, 2)}\n`);
+  ok(`dev script -> tinacms dev -c "${inner}"`);
+})();
 
 // ── done ───────────────────────────────────────────────────────────────────
-if (configWired) {
-  console.log('\n\x1b[1m✓ Wired.\x1b[0m Two small edits, then run:');
-  console.log('  1. paste the docs collection above into tina/config.ts (replace the sample)');
-  console.log('  2. spread ...fumadocsComponents into your getMDXComponents (snippet above)');
-  console.log(`  3. ${pm} run dev   →   http://localhost:3000/admin   → click a doc`);
-} else {
-  console.log('\n\x1b[33m⚠ next.config was NOT patched. Do these, then run:\x1b[0m');
-  console.log("  1. add  transpilePackages: ['tinacms-fumadocs-pkg']  to your next.config");
-  console.log('     (the adapter ships TypeScript, so it MUST be transpiled or the build fails)');
-  console.log('  2. paste the docs collection above into tina/config.ts');
-  console.log('  3. spread ...fumadocsComponents into your getMDXComponents (snippet above)');
-  console.log(`  4. then ${pm} run dev   →   http://localhost:3000/admin`);
+const fullyWired = configWired && collectionWired && componentsWired;
+console.log(`\n\x1b[1m${fullyWired ? '✓ Wired.' : '✓ Almost wired — finish the ! items below.'}\x1b[0m`);
+
+if (!configWired) {
+  console.log("\n  next.config — add:  transpilePackages: ['tinacms-fumadocs-pkg']");
+  console.log('  (the adapter ships TypeScript, so it MUST be transpiled or the build fails)');
 }
+if (!collectionWired) {
+  console.log('\n  tina/config.ts — add the import at the top:');
+  console.log(`    import { fumadocsTemplates } from '${ADAPTER}/templates';`);
+  console.log('  and put this collection inside schema.collections (replace the sample):');
+  console.log(DOCS_COLLECTION);
+}
+if (!componentsWired) {
+  console.log('\n  components/mdx.tsx — spread the render components:');
+  console.log(`    import { fumadocsComponents } from '${ADAPTER}/components';`);
+  console.log('    return { ...defaultMdxComponents, ...fumadocsComponents, ...components };');
+}
+
+console.log(`\n  Then:  \x1b[1m${pm} run dev\x1b[0m   →   http://localhost:3000/admin   → click a doc to edit\n`);
