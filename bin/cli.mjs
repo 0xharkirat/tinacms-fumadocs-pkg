@@ -20,13 +20,13 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PKG_ROOT = join(HERE, '..'); // adapter package root — templates/ lives here
+const PKG_ROOT = join(HERE, '..'); // adapter package root, templates/ lives here
 const CWD = process.cwd(); // the user's project
 
 const ADAPTER = 'tinacms-fumadocs-pkg';
 const ADAPTER_SPEC = 'github:0xharkirat/tinacms-fumadocs-pkg';
 // Peer deps the adapter needs but create-fumadocs-app / `tinacms init` do NOT
-// install (singletons + version-coupled libs — see README "Why peer deps").
+// install (singletons + version-coupled libs, see README "Why peer deps").
 const PEERS = ['@tinacms/bridge@^0.3.0', '@tinacms/mdx@^2', '@mdx-js/mdx@^3'];
 
 // The docs collection we inject into tina/config.ts (or print as a fallback).
@@ -72,7 +72,7 @@ console.log('\n\x1b[1mtinacms-fumadocs-pkg · init\x1b[0m');
 // ── preflight ──────────────────────────────────────────────────────────────
 const pkgJsonPath = join(CWD, 'package.json');
 if (!existsSync(pkgJsonPath)) {
-  console.error(`\nNo package.json in ${CWD} — run this inside your Fumadocs project.`);
+  console.error(`\nNo package.json in ${CWD}, run this inside your Fumadocs project.`);
   process.exit(1);
 }
 const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
@@ -86,19 +86,19 @@ const pm = existsSync(join(CWD, 'pnpm-lock.yaml'))
       ? 'bun'
       : 'npm';
 
-// src/app vs app — also decides whether the generated tina client needs the
+// src/app vs app, also decides whether the generated tina client needs the
 // @tina/* alias (it lives at root tina/, but @/ points at src/).
 const srcDir = existsSync(join(CWD, 'src', 'app'));
 const appDir = srcDir ? join(CWD, 'src', 'app') : join(CWD, 'app');
 if (!existsSync(appDir)) {
-  console.error('\nNo app/ or src/app/ — this needs a Next.js App Router project.');
+  console.error('\nNo app/ or src/app/, this needs a Next.js App Router project.');
   process.exit(1);
 }
 
 if (!allDeps['fumadocs-core'])
-  warn('fumadocs-core not found — is this a Fumadocs site? Continuing anyway.');
+  warn('fumadocs-core not found, is this a Fumadocs site? Continuing anyway.');
 if (!allDeps['tinacms'])
-  warn('tinacms not found — run `pnpm dlx @tinacms/cli init` first for the Tina basics.');
+  warn('tinacms not found, run `pnpm dlx @tinacms/cli init` first for the Tina basics.');
 
 console.log(`  package manager: ${pm}   app dir: ${rel(appDir)}/`);
 
@@ -124,7 +124,7 @@ if (toInstall.length === 0) {
     execSync(`${addCmd} ${toInstall.join(' ')}`, { cwd: CWD, stdio: 'inherit' });
     ok(`installed ${toInstall.length} package(s)`);
   } catch {
-    warn(`install failed — run it yourself:  ${addCmd} ${toInstall.join(' ')}`);
+    warn(`install failed, run it yourself:  ${addCmd} ${toInstall.join(' ')}`);
   }
 }
 
@@ -141,11 +141,11 @@ function writeFile(templateName, destPath, { backup = false, wiredMarker } = {})
   if (existsSync(destPath)) {
     const cur = readFileSync(destPath, 'utf8');
     if (wiredMarker && cur.includes(wiredMarker)) {
-      ok(`${rel(destPath)} already wired — skipped`);
+      ok(`${rel(destPath)} already wired, skipped`);
       return;
     }
     if (!backup) {
-      ok(`${rel(destPath)} exists — skipped`);
+      ok(`${rel(destPath)} exists, skipped`);
       return;
     }
     const bak = `${destPath}.orig`;
@@ -223,7 +223,7 @@ if (srcDir) {
         ok('added @tina/* alias to tsconfig.json');
       }
     } catch {
-      warn('tsconfig has comments — add manually under compilerOptions.paths: "@tina/*": ["./tina/*"]');
+      warn('tsconfig has comments, add manually under compilerOptions.paths: "@tina/*": ["./tina/*"]');
     }
   }
 }
@@ -247,7 +247,7 @@ step('Gitignoring the Tina admin build (public/admin)');
   ok('added public/admin to .gitignore');
 })();
 
-// ── 7. tina/config.ts — the docs collection ────────────────────────────────
+// ── 7. tina/config.ts, the docs collection ────────────────────────────────
 // Replace Tina's sample collection with a Fumadocs `docs` collection. The
 // sample tina-init config is deterministic, so we add the import and rewrite
 // the contents of `collections: [ … ]` by bracket-matching. Anything unexpected
@@ -257,7 +257,7 @@ let collectionWired = false;
 try {
   const f = join(CWD, 'tina', 'config.ts');
   if (!existsSync(f)) {
-    warn('no tina/config.ts — run `pnpm dlx @tinacms/cli init` first, then re-run');
+    warn('no tina/config.ts, run `pnpm dlx @tinacms/cli init` first, then re-run');
   } else {
     let src = readFileSync(f, 'utf8');
     if (src.includes('fumadocsTemplates') || /["']content\/docs["']/.test(src)) {
@@ -281,7 +281,7 @@ try {
         }
       }
       if (close < 0) {
-        warn('could not find the collections array — paste the docs collection below into tina/config.ts');
+        warn('could not find the collections array, paste the docs collection below into tina/config.ts');
       } else {
         src = `${src.slice(0, open + 1)}\n${DOCS_COLLECTION}\n    ${src.slice(close)}`;
         writeFileSync(f, src);
@@ -291,10 +291,10 @@ try {
     }
   }
 } catch {
-  warn('could not edit tina/config.ts — paste the docs collection below');
+  warn('could not edit tina/config.ts, paste the docs collection below');
 }
 
-// ── 8. components/mdx.tsx — make every Embed component renderable ──────────
+// ── 8. components/mdx.tsx, make every Embed component renderable ──────────
 // Fumadocs' default map omits Steps / Accordions / Files; spread our matching
 // components into getMDXComponents so inserted blocks render on the page.
 step('Wiring the render components (getMDXComponents)');
@@ -307,14 +307,14 @@ try {
     join(CWD, 'src', 'mdx-components.tsx'),
   ].find(existsSync);
   if (!f) {
-    warn('no components/mdx.tsx — spread ...fumadocsComponents into getMDXComponents (snippet below)');
+    warn('no components/mdx.tsx, spread ...fumadocsComponents into getMDXComponents (snippet below)');
   } else {
     let src = readFileSync(f, 'utf8');
     if (src.includes('fumadocsComponents')) {
       componentsWired = true;
       ok(`${rel(f)} already spreads fumadocsComponents`);
     } else if (!/\.\.\.defaultMdxComponents,/.test(src)) {
-      warn(`couldn't find ...defaultMdxComponents in ${rel(f)} — add ...fumadocsComponents (snippet below)`);
+      warn(`couldn't find ...defaultMdxComponents in ${rel(f)}, add ...fumadocsComponents (snippet below)`);
     } else {
       const importLine = `import { fumadocsComponents } from '${ADAPTER}/components';\n`;
       src = /from\s+["']fumadocs-ui\/mdx["'];?\n/.test(src)
@@ -327,10 +327,10 @@ try {
     }
   }
 } catch {
-  warn('could not edit components/mdx.tsx — add ...fumadocsComponents (snippet below)');
+  warn('could not edit components/mdx.tsx, add ...fumadocsComponents (snippet below)');
 }
 
-// ── 9. package.json — wrap the dev script with tinacms dev ──────────────────
+// ── 9. package.json, wrap the dev script with tinacms dev ──────────────────
 step('Wrapping the dev script (tinacms dev)');
 (() => {
   // re-read: step 1 (install) rewrote package.json with the new deps
@@ -346,20 +346,20 @@ step('Wrapping the dev script (tinacms dev)');
 
 // ── done ───────────────────────────────────────────────────────────────────
 const fullyWired = configWired && collectionWired && componentsWired;
-console.log(`\n\x1b[1m${fullyWired ? '✓ Wired.' : '✓ Almost wired — finish the ! items below.'}\x1b[0m`);
+console.log(`\n\x1b[1m${fullyWired ? '✓ Wired.' : '✓ Almost wired, finish the ! items below.'}\x1b[0m`);
 
 if (!configWired) {
-  console.log("\n  next.config — add:  transpilePackages: ['tinacms-fumadocs-pkg']");
+  console.log("\n  next.config, add:  transpilePackages: ['tinacms-fumadocs-pkg']");
   console.log('  (the adapter ships TypeScript, so it MUST be transpiled or the build fails)');
 }
 if (!collectionWired) {
-  console.log('\n  tina/config.ts — add the import at the top:');
+  console.log('\n  tina/config.ts, add the import at the top:');
   console.log(`    import { fumadocsTemplates } from '${ADAPTER}/templates';`);
   console.log('  and put this collection inside schema.collections (replace the sample):');
   console.log(DOCS_COLLECTION);
 }
 if (!componentsWired) {
-  console.log('\n  components/mdx.tsx — spread the render components:');
+  console.log('\n  components/mdx.tsx, spread the render components:');
   console.log(`    import { fumadocsComponents } from '${ADAPTER}/components';`);
   console.log('    return { ...defaultMdxComponents, ...fumadocsComponents, ...components };');
 }
