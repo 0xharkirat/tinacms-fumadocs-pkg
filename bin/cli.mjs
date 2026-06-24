@@ -57,7 +57,11 @@ const DOCS_COLLECTION = `      {
             // Pin the Embed/insert control to the FRONT of the toolbar (tinacms
             // renders the toolbar in this order). 'embed' only shows when
             // \`templates\` exist (they do), so list it first to surface it.
-            toolbarOverride: ['embed', 'heading', 'link', 'image', 'quote', 'ul', 'ol', 'bold', 'italic', 'code', 'codeBlock', 'table', 'strikethrough', 'mermaid', 'raw', 'hr'],
+            // \`overrides.toolbar\` is the current Tina API (\`toolbarOverride\` is
+            // deprecated).
+            overrides: {
+              toolbar: ['embed', 'heading', 'link', 'image', 'quote', 'ul', 'ol', 'bold', 'italic', 'code', 'codeBlock', 'table', 'strikethrough', 'mermaid', 'raw', 'hr'],
+            },
           },
         ],
       },
@@ -88,7 +92,15 @@ const DOCS_COLLECTION = `      {
             name: 'pages',
             list: true,
             description:
-              '"slug"=page/folder · "..."=everything else (keep last) · "---Label---"=separator · "[Text](url)"=link · "!slug"=hide',
+              'Sidebar order. Keep "..." (= all other pages) or new docs vanish from the sidebar. Tokens: "slug"=page/folder · "..."=everything else (keep last) · "---Label---"=separator · "[Text](url)"=link · "!slug"=hide',
+            // Guard the most common foot-gun: a hand-edited \`pages\` list that
+            // drops the "..." token silently stops auto-listing new docs.
+            ui: {
+              validate: (value) => {
+                if (Array.isArray(value) && value.length && !value.includes('...'))
+                  return 'No "..." token: newly-created docs will NOT appear in the sidebar. Add "..." (usually last) to auto-include them.';
+              },
+            },
           },
         ],
       },`;

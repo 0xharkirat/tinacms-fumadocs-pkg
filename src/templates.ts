@@ -16,21 +16,65 @@
 
 import type { Template } from 'tinacms';
 
+// ── shared nested-toolbar tiers ───────────────────────────────────────────────
+// Every NESTED rich-text field (a `children` inside a component) gets an explicit
+// toolbar via `overrides: { toolbar: [...] }` — the current Tina API
+// (`toolbarOverride` is deprecated). Two reasons to set it:
+//   1. Consistency: an unconfigured rich-text field defaults to embed-LAST + the
+//      full toolbar. Pinning 'embed' FIRST makes the insert-block control land in
+//      the same spot everywhere (matching the body field in bin/cli.mjs).
+//   2. Fit: a file tree wants almost no formatting; prose-in-a-box wants most of
+//      it. Three tiers cover every nested field below.
+// Defined once and reused (DRY) — pick the tier that matches the field's layout.
+
+// `as const` keeps each token a string LITERAL so the arrays match Tina's
+// `ToolbarOverrideType[]` (a union of those literals) instead of widening to
+// string[]. At each use site we spread (`[...TIER]`) into a fresh mutable array,
+// which is what `overrides.toolbar` expects. Every token below is a member of
+// ToolbarOverrideType in @tinacms/schema-tools.
+
+// Prose that can sit at full width, so a block image reads fine.
+const NESTED_WITH_IMAGE = ['embed', 'bold', 'italic', 'link', 'image', 'code', 'ul', 'ol', 'quote'] as const;
+// Prose in a narrow/coloured box (Callout, Banner) — drop 'image' (a full-bleed
+// image looks wrong inside a tight notice), keep the rest.
+const NESTED_NO_IMAGE = ['embed', 'bold', 'italic', 'link', 'code', 'ul', 'ol', 'quote'] as const;
+// File trees (Files / Folder children): not prose. The only useful insert is the
+// File/Folder block itself, so expose 'embed' alone.
+const EMBED_ONLY = ['embed'] as const;
+
 // ── child-only blocks (only ever live inside a parent's `children` field) ─────
 
 const Tab: Template = {
   name: 'Tab',
   label: 'Tab',
   fields: [
-    { name: 'value', label: 'Tab label', type: 'string' },
-    { name: 'children', label: 'Content', type: 'rich-text' },
+    {
+      name: 'value',
+      label: 'Label (must match the list above)',
+      type: 'string',
+    },
+    // Full-width tab panel → image-capable toolbar.
+    {
+      name: 'children',
+      label: 'Content',
+      type: 'rich-text',
+      overrides: { toolbar: [...NESTED_WITH_IMAGE] },
+    },
   ],
 };
 
 const Step: Template = {
   name: 'Step',
   label: 'Step',
-  fields: [{ name: 'children', label: 'Content', type: 'rich-text' }],
+  fields: [
+    // A step is full-width prose → image-capable toolbar.
+    {
+      name: 'children',
+      label: 'Content',
+      type: 'rich-text',
+      overrides: { toolbar: [...NESTED_WITH_IMAGE] },
+    },
+  ],
 };
 
 const Accordion: Template = {
@@ -38,7 +82,13 @@ const Accordion: Template = {
   label: 'Accordion',
   fields: [
     { name: 'title', label: 'Title', type: 'string' },
-    { name: 'children', label: 'Content', type: 'rich-text' },
+    // Accordion panel is full-width prose → image-capable toolbar.
+    {
+      name: 'children',
+      label: 'Content',
+      type: 'rich-text',
+      overrides: { toolbar: [...NESTED_WITH_IMAGE] },
+    },
   ],
 };
 
@@ -58,7 +108,14 @@ const Folder: Template = {
     // ITSELF, which makes Tina's schema validation recurse forever ("Maximum
     // call stack size exceeded" on dev start). So a folder holds files, and the
     // top-level <Files> holds files + folders — but folders don't nest.
-    { name: 'children', label: 'Files', type: 'rich-text', templates: [FileItem] },
+    // File tree, not prose → embed-only toolbar.
+    {
+      name: 'children',
+      label: 'Files',
+      type: 'rich-text',
+      templates: [FileItem],
+      overrides: { toolbar: [...EMBED_ONLY] },
+    },
   ],
 };
 
@@ -71,15 +128,34 @@ const Folder: Template = {
 // both places — you never insert `Cards` just to add a single card.
 //
 // Fields are the minimal, faithfully-modelable subset of Fumadocs' CardProps.
-// Deferred: `external` (a boolean, add when needed) and `icon` (a React node /
-// JSX, which a flat field can't represent). `title` rich-text is a later step.
+// Deferred: `icon` (a React node / JSX, which a flat field can't represent).
+// `title` rich-text is a later step.
 const Card: Template = {
   name: 'Card',
   label: 'Card',
   fields: [
-    { name: 'title', label: 'Title', type: 'string', required: true },
+    {
+      name: 'title',
+      label: 'Title',
+      type: 'string',
+      required: true,
+      // `Template` has no description field, so surface the layout note on the
+      // first field the editor sees: a lone Card spans the full content width;
+      // wrap several Cards in a `Cards` grid for the side-by-side tile layout.
+      description: 'A single Card spans the full width. Use a Cards grid for a side-by-side layout.',
+    },
     { name: 'description', label: 'Description', type: 'string' },
     { name: 'href', label: 'Link (href)', type: 'string' },
+    { name: 'external', label: 'Open link in new tab', type: 'boolean' },
+    // Fumadocs' <Card> renders its children under the title, so this round-trips
+    // losslessly. Full-width box → image-capable toolbar.
+    {
+      name: 'children',
+      label: 'Body content',
+      type: 'rich-text',
+      description: 'Optional rich content shown under the title',
+      overrides: { toolbar: [...NESTED_WITH_IMAGE] },
+    },
   ],
 };
 
@@ -94,10 +170,25 @@ const Callout: Template = {
       name: 'type',
       label: 'Type',
       type: 'string',
-      // fumadocs-ui CalloutType (v16). Verify against your installed version.
-      options: ['info', 'warn', 'warning', 'error', 'success', 'idea'],
+      // The 5 REAL fumadocs-ui CalloutType values, each with a plain-English
+      // label. 'warn' is dropped: it's only a runtime alias of 'warning', so
+      // offering both just confuses the editor.
+      options: [
+        { value: 'info', label: 'Info (blue)' },
+        { value: 'warning', label: 'Warning (yellow)' },
+        { value: 'error', label: 'Error (red)' },
+        { value: 'success', label: 'Success (green)' },
+        { value: 'idea', label: 'Idea / Tip (lightbulb)' },
+      ],
+      ui: { component: 'select' },
     },
-    { name: 'children', label: 'Content', type: 'rich-text' },
+    // Callout is a narrow coloured box → no-image toolbar.
+    {
+      name: 'children',
+      label: 'Content',
+      type: 'rich-text',
+      overrides: { toolbar: [...NESTED_NO_IMAGE] },
+    },
   ],
 };
 
@@ -113,7 +204,17 @@ const Tabs: Template = {
   name: 'Tabs',
   label: 'Tabs',
   fields: [
-    { name: 'items', label: 'Tab labels', type: 'string', list: true },
+    // Fumadocs binds the Tabs by position: the Nth label in this list names the
+    // Nth Tab below. So this list and the Tab blocks must stay the same length
+    // and in the same order, and each label must match its Tab's "Label" field.
+    {
+      name: 'items',
+      label: 'Tab labels (must match each Tab\'s label below, in order)',
+      type: 'string',
+      list: true,
+      description:
+        'One entry per tab, in order. Each must match the "Label" of the matching Tab block below — the labels here drive the tab buttons; the Tab blocks hold the content.',
+    },
     { name: 'children', label: 'Tabs', type: 'rich-text', templates: [Tab] },
   ],
 };
@@ -129,13 +230,19 @@ const Accordions: Template = {
   label: 'Accordions',
   fields: [
     {
-      // Required by Fumadocs/Radix. "single" = one open at a time, "multiple" =
-      // any number. WITHOUT this field, parsing <Accordions type="…"> fails with
-      // "Unable to parse rich-text".
+      // Required by Fumadocs/Radix. WITHOUT this field, parsing
+      // <Accordions type="…"> fails with "Unable to parse rich-text". This only
+      // sets the open/close behaviour — add as many Accordion items as you like.
       name: 'type',
-      label: 'Type',
+      label: 'Open behaviour',
       type: 'string',
-      options: ['single', 'multiple'],
+      description:
+        'How many panels can be open at once. Does NOT limit how many items you can add.',
+      options: [
+        { value: 'single', label: 'One at a time (opening one closes others)' },
+        { value: 'multiple', label: 'Allow several open at once' },
+      ],
+      ui: { component: 'select' },
     },
     { name: 'children', label: 'Accordions', type: 'rich-text', templates: [Accordion] },
   ],
@@ -144,7 +251,16 @@ const Accordions: Template = {
 const Files: Template = {
   name: 'Files',
   label: 'Files',
-  fields: [{ name: 'children', label: 'Files', type: 'rich-text', templates: [FileItem, Folder] }],
+  // File tree, not prose → embed-only toolbar.
+  fields: [
+    {
+      name: 'children',
+      label: 'Files',
+      type: 'rich-text',
+      templates: [FileItem, Folder],
+      overrides: { toolbar: [...EMBED_ONLY] },
+    },
+  ],
 };
 
 // ── GithubInfo ────────────────────────────────────────────────────────────────
@@ -163,16 +279,16 @@ const GithubInfo: Template = {
 };
 
 // ── Banner ────────────────────────────────────────────────────────────────────
-// A site-wide notice bar that wraps its content. `id` is optional but enables the
-// per-user dismiss button + localStorage memory, so it's worth exposing. `variant`
-// uses the component's own BannerVariant union ('normal' | 'rainbow'). The wrapped
-// content maps to a `children` rich-text field. height / rainbowColors / changeLayout
-// are advanced styling props, omitted to keep the form minimal.
+// A site-wide notice bar that wraps its content. `dismissable` adds a close button
+// (its dismissed state is remembered per visitor via `id`). `variant` uses the
+// component's own BannerVariant union ('normal' | 'rainbow'). `className` is a
+// passthrough for custom Tailwind/CSS colours. The wrapped content maps to a
+// `children` rich-text field. height / rainbowColors / changeLayout are advanced
+// styling props, omitted to keep the form minimal.
 const Banner: Template = {
   name: 'Banner',
   label: 'Banner',
   fields: [
-    { name: 'id', label: 'ID (enables dismiss + memory)', type: 'string' },
     {
       name: 'variant',
       label: 'Variant',
@@ -180,7 +296,33 @@ const Banner: Template = {
       // BannerVariant union from fumadocs-ui banner.tsx.
       options: ['normal', 'rainbow'],
     },
-    { name: 'children', label: 'Content', type: 'rich-text' },
+    {
+      name: 'dismissable',
+      label: 'Allow visitors to dismiss',
+      type: 'boolean',
+      description:
+        'Shows a close button. Once a visitor closes it, it stays hidden for them (remembered per visitor in their browser).',
+    },
+    {
+      name: 'id',
+      label: 'Dismiss memory key',
+      type: 'string',
+      description:
+        'A short, stable id (e.g. "summer-sale-2026"). Keep it the same once published — changing it makes a dismissed banner reappear. Only used when dismissable is on.',
+    },
+    {
+      name: 'className',
+      label: 'Custom CSS classes (advanced)',
+      type: 'string',
+      description: 'Tailwind/CSS classes for custom colors, e.g. "bg-purple-600 text-white".',
+    },
+    // Banner is a narrow notice bar → no-image toolbar.
+    {
+      name: 'children',
+      label: 'Content',
+      type: 'rich-text',
+      overrides: { toolbar: [...NESTED_NO_IMAGE] },
+    },
   ],
 };
 
