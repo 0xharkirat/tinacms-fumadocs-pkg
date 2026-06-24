@@ -32,6 +32,12 @@ import { serializeMDX } from '@tinacms/mdx';
 import { compileFumadocsMDXClient } from './client-compile';
 import { fumadocsTemplates } from './templates';
 import { useSetLiveToc, type LiveToc } from './live-toc';
+// Wraps the REAL component map in per-component error boundaries + Suspense and
+// guards the three known insert-time crashers (img / GithubInfo / InlineTOC), so
+// a half-filled block degrades to a placeholder instead of white-screening the
+// preview. PREVIEW-ONLY: applied to the in-iframe live <Body> below; the
+// outside-iframe path keeps rendering the unmodified real <MDX> children.
+import { toPreviewComponents } from './live-error-boundary';
 
 export interface TinaLiveBodyProps {
   /** The bridge form id; we only react to `updateData` for THIS form. */
@@ -188,7 +194,10 @@ function LiveBody({
     // a live body owns this page, so it skips its router.refresh() fallback (which
     // would otherwise revert the title leaf-patch back to saved disk state).
     <div data-tina-field={bodyField} data-tina-live="" className={className}>
-      {Body ? <Body components={getComponents()} /> : children}
+      {/* Live-compiled body renders with the PREVIEW-SAFE map so an incomplete
+          insert can't crash the whole preview. Until the first compile we still
+          show the real saved <MDX> (children), which is production-safe as-is. */}
+      {Body ? <Body components={toPreviewComponents(getComponents())} /> : children}
     </div>
   );
 }
