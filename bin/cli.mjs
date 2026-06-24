@@ -3,11 +3,12 @@
 // ---------------------------------------------------------------------------
 // One command to add TinaCMS contextual editing to an existing Fumadocs
 // (Next.js App Router) site. It installs the adapter + its peer deps, writes
-// the two Fumadocs-specific files (the wired docs page + the keystroke-live
-// island route), and patches everything else it can reach safely: next.config,
-// tsconfig, the tina/config.ts collection, the getMDXComponents map, and the
-// dev script. Anything it can't edit safely it prints for you to paste. Zero
-// runtime deps so it runs straight from `npx github:…` with no build step.
+// the two Fumadocs-specific files (the wired docs page + the live-body client
+// boundary it imports), and patches everything else it can reach safely:
+// next.config, tsconfig, the tina/config.ts collection, the getMDXComponents
+// map, and the dev script. Anything it can't edit safely it prints for you to
+// paste. Zero runtime deps so it runs straight from `npx github:…` with no
+// build step.
 import {
   existsSync,
   readFileSync,
@@ -27,7 +28,7 @@ const ADAPTER = 'tinacms-fumadocs-pkg';
 const ADAPTER_SPEC = 'github:0xharkirat/tinacms-fumadocs-pkg';
 // Peer deps the adapter needs but create-fumadocs-app / `tinacms init` do NOT
 // install (singletons + version-coupled libs, see README "Why peer deps").
-const PEERS = ['@tinacms/bridge@^0.3.0', '@tinacms/mdx@^2', '@mdx-js/mdx@^3'];
+const PEERS = ['@tinacms/bridge@^0.3.0', '@tinacms/mdx@^2', '@mdx-js/mdx@^3', '@fumadocs/mdx-remote@^1'];
 
 // The docs collection we inject into tina/config.ts (or print as a fallback).
 // Indented to sit inside `schema.collections: [ … ]`. Backticks / ${…} / the
@@ -94,6 +95,10 @@ if (!existsSync(appDir)) {
   console.error('\nNo app/ or src/app/, this needs a Next.js App Router project.');
   process.exit(1);
 }
+// Where the `@/components/*` alias resolves on disk: src/components for a
+// src-dir project, components otherwise. The wired page.tsx imports the live-body
+// client wrapper from `@/components/tina-live-body`, so it must land here.
+const componentsDir = srcDir ? join(CWD, 'src', 'components') : join(CWD, 'components');
 
 if (!allDeps['fumadocs-core'])
   warn('fumadocs-core not found, is this a Fumadocs site? Continuing anyway.');
@@ -157,16 +162,21 @@ function writeFile(templateName, destPath, { backup = false, wiredMarker } = {})
   ok(`wrote ${rel(destPath)}`);
 }
 
-// ── 2. island route (new file) ─────────────────────────────────────────────
-step('Writing the keystroke-live island route');
-writeFile('route.ts', join(appDir, 'api', 'tina-island', 'docs', '[[...slug]]', 'route.ts'));
-
-// ── 3. docs page (wire it; back up the original) ───────────────────────────
+// ── 2. docs page (wire it; back up the original) ───────────────────────────
 step('Wiring the docs page');
 writeFile('page.tsx', join(appDir, 'docs', '[[...slug]]', 'page.tsx'), {
   backup: true,
   wiredMarker: 'tinacms-fumadocs-pkg:wired',
 });
+
+// ── 3. live-body client boundary (the file the wired page imports) ──────────
+// The wired page.tsx imports `@/components/tina-live-body` (the CLIENT boundary
+// that binds the REAL Fumadocs components to the live preview — a Server
+// Component can't pass the `getComponents` function prop directly). Emit it next
+// to the page so a fresh init never produces a page.tsx importing a missing file.
+// Don't clobber a user's existing file (backup defaults to false → skip).
+step('Writing the live-body client boundary');
+writeFile('tina-live-body.tsx', join(componentsDir, 'tina-live-body.tsx'));
 
 // ── 4. next.config transpilePackages ───────────────────────────────────────
 // The adapter ships TS (no dist), so a missing transpilePackages entry is a hard

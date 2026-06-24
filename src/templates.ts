@@ -2,7 +2,7 @@
 // editable blocks in the admin instead of opaque text. Spread the top-level
 // set into your body rich-text field's `templates`:
 //
-//   import { fumadocsTemplates } from 'fumadocs-tinacms/templates';
+//   import { fumadocsTemplates } from 'tinacms-fumadocs-pkg/templates';
 //   // ...
 //   { type: 'rich-text', name: 'body', isBody: true,
 //     templates: [...fumadocsTemplates, ...yourCustomTemplates] }
@@ -12,21 +12,11 @@
 //
 // `template.name` must match the JSX component name Fumadocs renders. A
 // component's child MDX content maps to a `children` rich-text field; nested
-// components (Card inside Cards, etc.) are declared as that field's templates.
+// components (Tab inside Tabs, etc.) are declared as that field's templates.
 
 import type { Template } from 'tinacms';
 
-// --- nested children (only used inside a parent's `children` field) ---
-
-const Card: Template = {
-  name: 'Card',
-  label: 'Card',
-  fields: [
-    { name: 'title', label: 'Title', type: 'string' },
-    { name: 'description', label: 'Description', type: 'string' },
-    { name: 'href', label: 'Href', type: 'string' },
-  ],
-};
+// ── child-only blocks (only ever live inside a parent's `children` field) ─────
 
 const Tab: Template = {
   name: 'Tab',
@@ -72,7 +62,28 @@ const Folder: Template = {
   ],
 };
 
-// --- top-level components (usable directly in the doc body) ---
+// ── Card ──────────────────────────────────────────────────────────────────────
+// A single content card: a heading, an optional description, an optional link.
+//
+// Fumadocs renders a `<Card>` fine on its own; `<Cards>` is ONLY a responsive
+// grid wrapper. So Card is exposed BOTH as a top-level block (drop one straight
+// into the body) AND as a child of `Cards` (for a grid). One template, reused in
+// both places — you never insert `Cards` just to add a single card.
+//
+// Fields are the minimal, faithfully-modelable subset of Fumadocs' CardProps.
+// Deferred: `external` (a boolean, add when needed) and `icon` (a React node /
+// JSX, which a flat field can't represent). `title` rich-text is a later step.
+const Card: Template = {
+  name: 'Card',
+  label: 'Card',
+  fields: [
+    { name: 'title', label: 'Title', type: 'string', required: true },
+    { name: 'description', label: 'Description', type: 'string' },
+    { name: 'href', label: 'Link (href)', type: 'string' },
+  ],
+};
+
+// ── top-level blocks (insertable directly in the doc body) ────────────────────
 
 const Callout: Template = {
   name: 'Callout',
@@ -93,6 +104,8 @@ const Callout: Template = {
 const Cards: Template = {
   name: 'Cards',
   label: 'Cards',
+  // A responsive grid of cards. Reuses the single `Card` template above as its
+  // only nested block (DRY) — editing a card is identical inside or outside Cards.
   fields: [{ name: 'children', label: 'Cards', type: 'rich-text', templates: [Card] }],
 };
 
@@ -135,14 +148,18 @@ const Files: Template = {
 };
 
 /**
- * Top-level Tina templates for stock Fumadocs UI components. Nested components
- * (Card, Tab, Step, Accordion, File, Folder) are reachable inside their parents.
+ * Top-level Tina templates for stock Fumadocs UI components.
+ *
+ * `Card` appears here (standalone) AND inside `Cards` (grid). The other nested
+ * blocks (Tab, Step, Accordion, File, Folder) are reachable only inside their
+ * parents.
  *
  * Not included (round-trip as plain text, not visually editable — Jack's list):
  * TypeTable (nested JSON prop), components with icon/render/callback props.
  */
 export const fumadocsTemplates: Template[] = [
   Callout,
+  Card,
   Cards,
   Tabs,
   Steps,

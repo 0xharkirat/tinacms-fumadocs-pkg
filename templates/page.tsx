@@ -19,13 +19,13 @@ import {
   prepareTinaForm,
   withTinaMarkers,
   TinaEditBridge,
-  TinaIslandBody,
 } from 'tinacms-fumadocs-pkg';
-import { tinaIslandUrl, getIslandSeedHtml } from 'tinacms-fumadocs-pkg/island';
-import { previewComponents } from 'tinacms-fumadocs-pkg/preview';
+// Client boundary that binds the REAL Fumadocs components to the live preview
+// (a Server Component can't pass the `getComponents` function prop directly).
+// This file is emitted next to page.tsx by `tinacms-fumadocs-pkg init`.
+import { TinaLiveBodyClient } from '@/components/tina-live-body';
 import { client } from '@/tina/__generated__/client';
 import type { DocsQuery } from '@/tina/__generated__/types';
-import { createHash } from 'node:crypto';
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
@@ -45,22 +45,6 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
 
   const titleField = doc ? tinaField(doc, 'title') : undefined;
   const bodyField = doc ? tinaField(doc, 'body') : undefined;
-  const islandUrl = tina ? tinaIslandUrl(params.slug) : undefined;
-
-  // SSR the SAVED body through the SAME preview map the island route uses, so
-  // the first editor frame matches every keystroke refresh. remountKey hashes
-  // the saved body so the live container re-seeds cleanly after a save.
-  let islandSeedHtml: string | undefined;
-  let islandRemountKey: string | undefined;
-  if (islandUrl) {
-    const raw = await page.data.getText('raw');
-    islandRemountKey = createHash('sha1').update(raw).digest('hex').slice(0, 16);
-    islandSeedHtml = await getIslandSeedHtml({
-      getRawText: async () => raw,
-      getComponents: () => previewComponents(getMDXComponents()),
-      path: page.path,
-    });
-  }
 
   // Fumadocs' normal component map, with tina markers wrapped on top when editing.
   const baseComponents = getMDXComponents({
@@ -92,19 +76,15 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
         {page.data.description}
       </DocsDescription>
 
-      {/* Body stays a Fumadocs render. Inside the admin iframe, TinaIslandBody
-          takes over with the keystroke-live preview; everywhere else it renders
-          the real <MDX/> verbatim. */}
+      {/* Body stays a Fumadocs render. Inside the admin iframe, TinaLiveBody
+          takes over with a CLIENT-side keystroke-live preview that renders the
+          REAL Fumadocs components (no placeholder); everywhere else (and on the
+          editor's first paint) it renders the real <MDX/> verbatim. */}
       <DocsBody data-tina-field={bodyField}>
-        {islandUrl ? (
-          <TinaIslandBody
-            islandUrl={islandUrl}
-            initialHtml={islandSeedHtml ?? ''}
-            remountKey={islandRemountKey}
-            bodyField={bodyField}
-          >
+        {tina ? (
+          <TinaLiveBodyClient formId={tina.id} bodyField={bodyField}>
             <MDX components={components} />
-          </TinaIslandBody>
+          </TinaLiveBodyClient>
         ) : (
           <MDX components={components} />
         )}
