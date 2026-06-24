@@ -11,7 +11,7 @@
 //
 // This module makes the preview self-heal. It exports `toPreviewComponents`,
 // which takes the REAL Fumadocs map and returns a preview-safe one:
-//   • three known crashers get bespoke guards (img / GithubInfo / InlineTOC),
+//   • known crashers get bespoke guards (img / GithubInfo / InlineTOC / Tab),
 //   • EVERY entry is then wrapped in an <ErrorBoundary> + <Suspense> so any other
 //     component that throws (sync) or suspends (async) on insert degrades to a
 //     small placeholder and RECOVERS the instant the editor fills the field.
@@ -71,12 +71,25 @@ function SafeInlineTOC({
   return <Real items={items ?? []} {...rest} />;
 }
 
+// ── Tab: guard missing value ──────────────────────────────────────────────────
+// A freshly-inserted <Tab> (added before the editor sets a label) has no
+// resolvable `value`, and the real component throws "Failed to resolve tab
+// value". The ErrorBoundary catches it, but the throw still surfaces a Next.js
+// dev error overlay over the preview. We pass a fallback value so the real Tab
+// never throws; it updates live the moment the editor fills in a label.
+function SafeTab({ ...props }: Record<string, unknown>) {
+  const Real = realRef.Tab as ComponentType<Record<string, unknown>> | undefined;
+  if (!Real) return <PreviewPlaceholder>Tab</PreviewPlaceholder>;
+  const value = props.value ?? props.title ?? props.label ?? 'tab';
+  return <Real {...props} value={value} />;
+}
+
 // Holds the REAL overridden components so the Safe* wrappers above can reach the
 // genuine implementation without it being re-wrapped (the override map replaces
 // these keys, so a Safe* wrapper can't look itself up in the final map). Set per
 // call by `toPreviewComponents`. A module-level ref is fine: the preview renders
 // one body at a time from a single real map.
-const realRef: { GithubInfo?: unknown; InlineTOC?: unknown } = {};
+const realRef: { GithubInfo?: unknown; InlineTOC?: unknown; Tab?: unknown } = {};
 
 // ── shared placeholder ────────────────────────────────────────────────────────
 // Small, muted, non-throwing stand-in shown while a block is incomplete.
@@ -98,11 +111,18 @@ function PreviewPlaceholder({ children }: { children: ReactNode }) {
 }
 
 // ── ErrorBoundary ─────────────────────────────────────────────────────────────
-// Catches SYNCHRONOUS throws from one wrapped component, renders a placeholder,
-// and AUTO-RESETS when its children change so it recovers the moment the editor
-// fills the offending field. We re-key the boundary on `children` identity:
-// every live recompile produces fresh element children, so a changed prop yields
-// a new boundary instance with clean state — no manual reset wiring needed.
+// Catches SYNCHRONOUS throws from one wrapped component and renders a
+// placeholder. There is intentionally NO `key` here and no manual reset wiring:
+// recovery happens because each live recompile produces a brand-new `Body`
+// component TYPE (see live-body.tsx), so React unmounts the entire previous
+// subtree — failed boundaries included — and mounts fresh ones with clean state.
+// The boundary therefore self-heals the moment the editor fills the offending
+// field and the next recompile lands.
+//
+// CAVEAT: a boundary does NOT reset on a same-type re-render with new props —
+// once `failed` is set it stays set until unmount. That is fine here precisely
+// because every recompile is a new component type (a full unmount), never an
+// in-place prop change, so the boundary never needs to clear in place.
 //
 // NOTE: an error boundary catches throws only. GithubInfo throws a PROMISE (via
 // React `use()`), which is a SUSPENSE signal, not an error — so the boundary is
@@ -138,31 +158,35 @@ class ErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
 /**
  * Turn the REAL Fumadocs component map into a PREVIEW-SAFE one for the live body.
  *
- * 1. Override the three known crashers with their guarded versions
+ * 1. Override the known crashers with their guarded versions
  *    (img → plain lazy <img>, GithubInfo → empty-prop guard, InlineTOC → `items
- *    ?? []`).
+ *    ?? []`, Tab → fallback `value`).
  * 2. Wrap EVERY entry (overrides included) so that, per component instance:
  *      <ErrorBoundary><Suspense fallback>…</Suspense></ErrorBoundary>
  *    Suspense (inner) absorbs async-suspend / thrown promises (GithubInfo's
  *    `use()`); the ErrorBoundary (outer) absorbs synchronous throws. Both reset
- *    on the next recompile because the wrapper renders fresh children, so the
- *    preview recovers as soon as the field is filled. The boundary re-keys on
- *    children identity (see ErrorBoundary) for that recovery.
+ *    on the next recompile because each recompile yields a brand-new `Body`
+ *    component TYPE, so React unmounts the whole previous subtree (failed
+ *    boundaries included) and remounts fresh — see ErrorBoundary. The preview
+ *    thus recovers as soon as the field is filled.
  *
  * Only the LIVE preview uses this. Production renders the unmodified `real` map.
  */
 export function toPreviewComponents(real: MDXComponents): MDXComponents {
   // Expose the genuine implementations to the Safe* wrappers (which intentionally
-  // bypass the wrapped map for the real component).
+  // bypass the wrapped map for the real component). MUST run before the override
+  // map below replaces these keys, or the wrappers would capture themselves.
   realRef.GithubInfo = real.GithubInfo;
   realRef.InlineTOC = real.InlineTOC;
+  realRef.Tab = real.Tab;
 
-  // Start from the real map, then swap the three crashers for safe versions.
+  // Start from the real map, then swap the known crashers for safe versions.
   const overridden: MDXComponents = {
     ...real,
     img: PreviewImg,
     GithubInfo: SafeGithubInfo,
     InlineTOC: SafeInlineTOC,
+    Tab: SafeTab,
   };
 
   // Wrap every entry in <ErrorBoundary> + <Suspense>. Keyed by component name so
