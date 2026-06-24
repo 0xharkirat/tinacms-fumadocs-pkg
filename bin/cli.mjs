@@ -72,11 +72,17 @@ const DOCS_COLLECTION = `      {
         path: 'content/docs',
         format: 'json',
         match: { include: '**/meta' },
+        // Edit existing meta.json files; Tina's "Add file" can't satisfy the
+        // **/meta glob (it would write undefined.json), so hide create/delete.
+        ui: { allowedActions: { create: false, delete: false } },
         fields: [
-          { type: 'string', name: 'title' },
-          { type: 'boolean', name: 'defaultOpen' },
-          { type: 'boolean', name: 'root' },
-          { type: 'string', name: 'pagesIndex' },
+          { type: 'string', name: 'title', label: 'Sidebar title' },
+          { type: 'string', name: 'description', label: 'Description' },
+          { type: 'string', name: 'icon', label: 'Icon' },
+          { type: 'boolean', name: 'root', label: 'Root section (sidebar tab)' },
+          { type: 'boolean', name: 'defaultOpen', label: 'Open by default' },
+          { type: 'boolean', name: 'collapsible', label: 'Collapsible' },
+          { type: 'string', name: 'pagesIndex', label: 'Index page slug' },
           {
             type: 'string',
             name: 'pages',
@@ -371,6 +377,22 @@ try {
 } catch {
   warn('could not edit components/mdx.tsx, add ...fumadocsComponents (snippet below)');
 }
+
+// ── scaffold a starter content/docs/meta.json so the nav collection isn't empty
+step('Scaffolding the navigation meta.json');
+(() => {
+  const metaPath = join(CWD, 'content', 'docs', 'meta.json');
+  if (existsSync(metaPath)) return ok('content/docs/meta.json already present');
+  try {
+    mkdirSync(dirname(metaPath), { recursive: true });
+    // {"pages":["..."]} is a no-op nav-wise (everything, default order) but gives
+    // the editor a real doc to open + reorder in the Navigation collection.
+    writeFileSync(metaPath, `${JSON.stringify({ pages: ['...'] }, null, 2)}\n`);
+    ok('wrote content/docs/meta.json');
+  } catch {
+    warn('could not write content/docs/meta.json');
+  }
+})();
 
 // ── 9. package.json, wrap the dev script with tinacms dev ──────────────────
 step('Wrapping the dev script (tinacms dev)');
