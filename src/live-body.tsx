@@ -31,6 +31,7 @@ import type { MDXComponents } from 'mdx/types';
 import { serializeMDX } from '@tinacms/mdx';
 import { compileFumadocsMDXClient } from './client-compile';
 import { fumadocsTemplates } from './templates';
+import { useSetLiveToc, type LiveToc } from './live-toc';
 
 export interface TinaLiveBodyProps {
   /** The bridge form id; we only react to `updateData` for THIS form. */
@@ -48,6 +49,14 @@ export interface TinaLiveBodyProps {
   getComponents: () => MDXComponents;
   /** Debounce for the compile after each keystroke. Default 150ms. */
   debounceMs?: number;
+  /**
+   * Receives the freshly-compiled table of contents after each successful live
+   * compile, so a stateful <DocsPage> can re-render its "On this page" sidebar as
+   * headings are edited. Optional: when omitted, the toc is pushed to the nearest
+   * <TinaDocsPage> via context instead (see live-toc.tsx). Pass it explicitly only
+   * if you manage toc state yourself.
+   */
+  onToc?: (toc: LiveToc) => void;
   /**
    * The REAL Fumadocs body (`<MDX components=… />`). Shown to every visitor, on
    * the editor's first paint, and until the first overlay arrives.
@@ -115,8 +124,10 @@ function LiveBody({
   className,
   getComponents,
   debounceMs,
+  onToc,
   children,
-}: Required<Omit<TinaLiveBodyProps, 'children'>> & {
+}: Required<Omit<TinaLiveBodyProps, 'children' | 'onToc'>> & {
+  onToc?: (toc: LiveToc) => void;
   children: React.ReactNode;
 }) {
   // The compiled body FC, or null until the first overlay has compiled (we show
@@ -129,6 +140,13 @@ function LiveBody({
   // newer one) clobbering fresher output: only the latest request may commit.
   const latest = useRef(0);
 
+  // Where freshly-compiled tocs go: the explicit `onToc` prop if given, else the
+  // nearest <TinaDocsPage> via context (no-op when neither is present). Held in a
+  // ref so the message listener always calls the latest without re-subscribing.
+  const setLiveToc = useSetLiveToc();
+  const pushToc = useRef<(toc: LiveToc) => void>(() => {});
+  pushToc.current = onToc ?? setLiveToc;
+
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (!isUpdateData(event.data, formId)) return;
@@ -140,10 +158,14 @@ function LiveBody({
         timer.current = null;
         const token = ++latest.current;
         compileFumadocsMDXClient(mdx)
-          .then(({ Body: NextBody }) => {
+          .then(({ Body: NextBody, toc }) => {
+            // Ignore stale resolutions (a newer keystroke already won).
+            if (token !== latest.current) return;
             // Wrap in a function so React stores the FC as state (a bare FC would
-            // be called as an updater). Ignore stale resolutions.
-            if (token === latest.current && NextBody) setBody(() => NextBody);
+            // be called as an updater).
+            if (NextBody) setBody(() => NextBody);
+            // Push the recomputed toc up so the sidebar tracks heading edits.
+            pushToc.current(toc as LiveToc);
           })
           .catch((err) => {
             // Surface compile errors in the console; keep the last good render.
@@ -201,6 +223,7 @@ export function TinaLiveBody({
       className={rest.className ?? ''}
       formId={rest.formId}
       getComponents={rest.getComponents}
+      onToc={rest.onToc}
     >
       {children}
     </LiveBody>

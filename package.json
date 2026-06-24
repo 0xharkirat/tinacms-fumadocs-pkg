@@ -8,6 +8,7 @@
     "./server": "./src/server.ts",
     "./bridge": "./src/bridge.tsx",
     "./live-body": "./src/live-body.tsx",
+    "./live-toc": "./src/live-toc.tsx",
     "./client-compile": "./src/client-compile.ts",
     "./strip-mdx": "./src/strip-mdx.ts",
     "./markers": "./src/markers.tsx",
@@ -28,6 +29,7 @@
     "@tinacms/bridge": "^0.3.0",
     "@tinacms/mdx": ">=2",
     "fumadocs-core": ">=15",
+    "fumadocs-ui": ">=15",
     "next": ">=15",
     "react": ">=18",
     "tinacms": ">=3"

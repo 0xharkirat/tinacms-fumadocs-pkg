@@ -6,7 +6,6 @@ import { source } from '@/lib/source';
 import {
   DocsBody,
   DocsDescription,
-  DocsPage,
   DocsTitle,
 } from 'fumadocs-ui/layouts/docs/page';
 import { notFound } from 'next/navigation';
@@ -20,6 +19,9 @@ import {
   withTinaMarkers,
   TinaEditBridge,
 } from 'tinacms-fumadocs-pkg';
+// Stateful <DocsPage> whose "On this page" toc tracks live heading edits inside
+// the admin iframe (renders the same static toc for real visitors).
+import { TinaDocsPage } from 'tinacms-fumadocs-pkg/live-toc';
 // Client boundary that binds the REAL Fumadocs components to the live preview
 // (a Server Component can't pass the `getComponents` function prop directly).
 // This file is emitted next to page.tsx by `tinacms-fumadocs-pkg init`.
@@ -55,7 +57,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
     : baseComponents;
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
+    <TinaDocsPage toc={page.data.toc} full={page.data.full}>
       {/* Form payload @tinacms/bridge discovers to open the sidebar form. */}
       {tina ? (
         <>
@@ -89,7 +91,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
           <MDX components={components} />
         )}
       </DocsBody>
-    </DocsPage>
+    </TinaDocsPage>
   );
 }
 
