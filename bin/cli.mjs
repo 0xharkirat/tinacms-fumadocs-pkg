@@ -57,7 +57,7 @@ const DOCS_COLLECTION = `      {
             // Pin the Embed/insert control to the FRONT of the toolbar (tinacms
             // renders the toolbar in this order). 'embed' only shows when
             // \`templates\` exist (they do), so list it first to surface it.
-            toolbarOverride: ['embed', 'heading', 'link', 'image', 'quote', 'ul', 'ol', 'bold', 'italic', 'code', 'codeBlock', 'table'],
+            toolbarOverride: ['embed', 'heading', 'link', 'image', 'quote', 'ul', 'ol', 'bold', 'italic', 'code', 'codeBlock', 'table', 'strikethrough', 'mermaid', 'raw', 'hr'],
           },
         ],
       },
