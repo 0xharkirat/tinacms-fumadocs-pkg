@@ -197,7 +197,16 @@ const Cards: Template = {
   label: 'Cards',
   // A responsive grid of cards. Reuses the single `Card` template above as its
   // only nested block (DRY) — editing a card is identical inside or outside Cards.
-  fields: [{ name: 'children', label: 'Cards', type: 'rich-text', templates: [Card] }],
+  // Block container → embed-FIRST, no-image toolbar (a direct image breaks the grid).
+  fields: [
+    {
+      name: 'children',
+      label: 'Cards',
+      type: 'rich-text',
+      templates: [Card],
+      overrides: { toolbar: [...NESTED_NO_IMAGE] },
+    },
+  ],
 };
 
 const Tabs: Template = {
@@ -215,14 +224,30 @@ const Tabs: Template = {
       description:
         'One entry per tab, in order. Each must match the "Label" of the matching Tab block below — the labels here drive the tab buttons; the Tab blocks hold the content.',
     },
-    { name: 'children', label: 'Tabs', type: 'rich-text', templates: [Tab] },
+    // Block container → embed-FIRST, no-image toolbar (a direct image breaks the grid).
+    {
+      name: 'children',
+      label: 'Tabs',
+      type: 'rich-text',
+      templates: [Tab],
+      overrides: { toolbar: [...NESTED_NO_IMAGE] },
+    },
   ],
 };
 
 const Steps: Template = {
   name: 'Steps',
   label: 'Steps',
-  fields: [{ name: 'children', label: 'Steps', type: 'rich-text', templates: [Step] }],
+  // Block container → embed-FIRST, no-image toolbar (a direct image breaks the grid).
+  fields: [
+    {
+      name: 'children',
+      label: 'Steps',
+      type: 'rich-text',
+      templates: [Step],
+      overrides: { toolbar: [...NESTED_NO_IMAGE] },
+    },
+  ],
 };
 
 const Accordions: Template = {
@@ -244,7 +269,14 @@ const Accordions: Template = {
       ],
       ui: { component: 'select' },
     },
-    { name: 'children', label: 'Accordions', type: 'rich-text', templates: [Accordion] },
+    // Block container → embed-FIRST, no-image toolbar (a direct image breaks the grid).
+    {
+      name: 'children',
+      label: 'Accordions',
+      type: 'rich-text',
+      templates: [Accordion],
+      overrides: { toolbar: [...NESTED_NO_IMAGE] },
+    },
   ],
 };
 
@@ -279,12 +311,14 @@ const GithubInfo: Template = {
 };
 
 // ── Banner ────────────────────────────────────────────────────────────────────
-// A site-wide notice bar that wraps its content. `dismissable` adds a close button
-// (its dismissed state is remembered per visitor via `id`). `variant` uses the
-// component's own BannerVariant union ('normal' | 'rainbow'). `className` is a
-// passthrough for custom Tailwind/CSS colours. The wrapped content maps to a
-// `children` rich-text field. height / rainbowColors / changeLayout are advanced
-// styling props, omitted to keep the form minimal.
+// A site-wide notice bar that wraps its content. A truthy `id` turns the banner
+// dismissable: fumadocs-ui only renders the close button when `id` is set, and
+// remembers the dismissed state per visitor under that key (there is NO separate
+// `dismissable` prop). `variant` uses the component's own BannerVariant union
+// ('normal' | 'rainbow'). `className` is a passthrough for custom Tailwind/CSS
+// colours. The wrapped content maps to a `children` rich-text field. height /
+// rainbowColors / changeLayout are advanced styling props, omitted to keep the
+// form minimal.
 const Banner: Template = {
   name: 'Banner',
   label: 'Banner',
@@ -297,18 +331,11 @@ const Banner: Template = {
       options: ['normal', 'rainbow'],
     },
     {
-      name: 'dismissable',
-      label: 'Allow visitors to dismiss',
-      type: 'boolean',
-      description:
-        'Shows a close button. Once a visitor closes it, it stays hidden for them (remembered per visitor in their browser).',
-    },
-    {
       name: 'id',
-      label: 'Dismiss memory key',
+      label: 'Make dismissable (memory key)',
       type: 'string',
       description:
-        'A short, stable id (e.g. "summer-sale-2026"). Keep it the same once published — changing it makes a dismissed banner reappear. Only used when dismissable is on.',
+        'Provide a short, STABLE id (e.g. "summer-sale-2026") to show a dismiss button and remember the choice per visitor. Leave empty for a non-dismissable banner. Keep it the same once published — changing it makes a dismissed banner reappear.',
     },
     {
       name: 'className',

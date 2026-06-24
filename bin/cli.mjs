@@ -93,14 +93,6 @@ const DOCS_COLLECTION = `      {
             list: true,
             description:
               'Sidebar order. Keep "..." (= all other pages) or new docs vanish from the sidebar. Tokens: "slug"=page/folder · "..."=everything else (keep last) · "---Label---"=separator · "[Text](url)"=link · "!slug"=hide',
-            // Guard the most common foot-gun: a hand-edited \`pages\` list that
-            // drops the "..." token silently stops auto-listing new docs.
-            ui: {
-              validate: (value) => {
-                if (Array.isArray(value) && value.length && !value.includes('...'))
-                  return 'No "..." token: newly-created docs will NOT appear in the sidebar. Add "..." (usually last) to auto-include them.';
-              },
-            },
           },
         ],
       },`;
