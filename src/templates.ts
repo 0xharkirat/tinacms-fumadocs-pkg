@@ -147,6 +147,71 @@ const Files: Template = {
   fields: [{ name: 'children', label: 'Files', type: 'rich-text', templates: [FileItem, Folder] }],
 };
 
+// ── GithubInfo ────────────────────────────────────────────────────────────────
+// A repo badge (stars / forks). `owner` + `repo` are the only required props and
+// the only ones a flat field can faithfully model. `token` is intentionally NOT
+// exposed: it is a secret that would land in committed MDX, and public repos need
+// none. The other props (baseUrl, locale, fetchOptions) are advanced/optional and
+// omitted to keep the form clean.
+const GithubInfo: Template = {
+  name: 'GithubInfo',
+  label: 'GitHub Info',
+  fields: [
+    { name: 'owner', label: 'Owner', type: 'string', required: true },
+    { name: 'repo', label: 'Repository', type: 'string', required: true },
+  ],
+};
+
+// ── Banner ────────────────────────────────────────────────────────────────────
+// A site-wide notice bar that wraps its content. `id` is optional but enables the
+// per-user dismiss button + localStorage memory, so it's worth exposing. `variant`
+// uses the component's own BannerVariant union ('normal' | 'rainbow'). The wrapped
+// content maps to a `children` rich-text field. height / rainbowColors / changeLayout
+// are advanced styling props, omitted to keep the form minimal.
+const Banner: Template = {
+  name: 'Banner',
+  label: 'Banner',
+  fields: [
+    { name: 'id', label: 'ID (enables dismiss + memory)', type: 'string' },
+    {
+      name: 'variant',
+      label: 'Variant',
+      type: 'string',
+      // BannerVariant union from fumadocs-ui banner.tsx.
+      options: ['normal', 'rainbow'],
+    },
+    { name: 'children', label: 'Content', type: 'rich-text' },
+  ],
+};
+
+// ── InlineTOC ─────────────────────────────────────────────────────────────────
+// A collapsible, in-body table of contents. Its `items` prop is `TOCItemType[]`
+// ({ title, url, depth }), modeled here as a Tina OBJECT list (list:true on a
+// `type:'object'` field). Tina serialises this as an array-of-object-literals JSX
+// prop — `items={[{ title:'…', url:'#…', depth:2 }]}` — which the live-preview
+// strip-mdx safe-literal allowlist preserves (every leaf is a string/number
+// literal), so the TOC survives the strip and renders live. `depth` is a number
+// so the component's indentation math works.
+const InlineTOC: Template = {
+  name: 'InlineTOC',
+  label: 'Inline TOC',
+  fields: [
+    {
+      name: 'items',
+      label: 'Items',
+      type: 'object',
+      list: true,
+      // Show a readable label per row in the Tina list UI.
+      ui: { itemProps: (item) => ({ label: item?.title || 'Item' }) },
+      fields: [
+        { name: 'title', label: 'Title', type: 'string', required: true },
+        { name: 'url', label: 'URL (e.g. #section)', type: 'string', required: true },
+        { name: 'depth', label: 'Depth', type: 'number' },
+      ],
+    },
+  ],
+};
+
 /**
  * Top-level Tina templates for stock Fumadocs UI components.
  *
@@ -165,4 +230,7 @@ export const fumadocsTemplates: Template[] = [
   Steps,
   Accordions,
   Files,
+  GithubInfo,
+  Banner,
+  InlineTOC,
 ];

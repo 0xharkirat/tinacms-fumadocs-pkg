@@ -51,7 +51,39 @@ const DOCS_COLLECTION = `      {
         },
         fields: [
           { type: 'string', name: 'title', label: 'Title', isTitle: true, required: true },
-          { type: 'rich-text', name: 'body', label: 'Body', isBody: true, templates: [...fumadocsTemplates] },
+          {
+            type: 'rich-text', name: 'body', label: 'Body', isBody: true,
+            templates: [...fumadocsTemplates],
+            // Pin the Embed/insert control to the FRONT of the toolbar (tinacms
+            // renders the toolbar in this order). 'embed' only shows when
+            // \`templates\` exist (they do), so list it first to surface it.
+            toolbarOverride: ['embed', 'heading', 'link', 'image', 'quote', 'ul', 'ol', 'bold', 'italic', 'code', 'codeBlock', 'table'],
+          },
+        ],
+      },
+      {
+        // Navigation editor: a second collection over the SAME content/docs path,
+        // scoped to meta.json (format:'json' + match.include:'**/meta' -> globs
+        // content/docs/**/meta.json). Coexists with the mdx \`docs\` collection
+        // (different format + match, so they never claim the same file). Editing
+        // is save-refresh: reorder \`pages\`, save, refresh to see the sidebar.
+        name: 'meta',
+        label: 'Navigation (meta.json)',
+        path: 'content/docs',
+        format: 'json',
+        match: { include: '**/meta' },
+        fields: [
+          { type: 'string', name: 'title' },
+          { type: 'boolean', name: 'defaultOpen' },
+          { type: 'boolean', name: 'root' },
+          { type: 'string', name: 'pagesIndex' },
+          {
+            type: 'string',
+            name: 'pages',
+            list: true,
+            description:
+              '"slug"=page/folder · "..."=everything else (keep last) · "---Label---"=separator · "[Text](url)"=link · "!slug"=hide',
+          },
         ],
       },`;
 

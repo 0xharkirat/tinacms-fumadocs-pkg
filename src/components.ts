@@ -18,6 +18,11 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { File, Folder, Files } from 'fumadocs-ui/components/files';
+// Extra single-import components (not in fumadocs-ui/mdx's default map), matching
+// the GithubInfo / Banner / InlineTOC templates added to `fumadocsTemplates`.
+import { GithubInfo } from 'fumadocs-ui/components/github-info';
+import { Banner } from 'fumadocs-ui/components/banner';
+import { InlineTOC } from 'fumadocs-ui/components/inline-toc';
 
 /** One entry per component in `fumadocsTemplates`. */
 export const fumadocsComponents = {
@@ -33,4 +38,7 @@ export const fumadocsComponents = {
   File,
   Folder,
   Files,
+  GithubInfo,
+  Banner,
+  InlineTOC,
 };

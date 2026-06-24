@@ -32,7 +32,7 @@ One command, fully reversible, so you can trust it:
 |---|---|
 | **installs** | the adapter + its 3 peer deps (`@tinacms/bridge`, `@tinacms/mdx`, `@mdx-js/mdx`) |
 | **writes** | the docs page `app/docs/[[...slug]]/page.tsx` (your original goes to `page.tsx.orig`) and the keystroke-live island route `app/api/tina-island/.../route.ts` |
-| **edits `tina/config.ts`** | replaces Tina's sample collection with a Fumadocs `docs` collection (kebab routes + the Embed-menu templates) |
+| **edits `tina/config.ts`** | replaces Tina's sample collection with a Fumadocs `docs` collection (kebab routes, the Embed-menu templates, Embed pinned to the front of the toolbar) **and** adds a `meta` collection for editing `meta.json` navigation |
 | **edits `components/mdx.tsx`** | spreads `fumadocsComponents` into `getMDXComponents`, so `Steps`/`Accordions`/`Files` render on the page |
 | **patches `next.config`** | adds `transpilePackages: ['tinacms-fumadocs-pkg']` (the adapter ships TypeScript) |
 | **patches `package.json`** | wraps your dev script: `tinacms dev -c "next dev"` |
@@ -96,7 +96,35 @@ import { fumadocsTemplates } from 'tinacms-fumadocs-pkg/templates';
   },
   fields: [
     { type: 'string', name: 'title', isTitle: true, required: true },
-    { type: 'rich-text', name: 'body', isBody: true, templates: [...fumadocsTemplates] },
+    {
+      type: 'rich-text', name: 'body', isBody: true,
+      templates: [...fumadocsTemplates],
+      // Pin the Embed/insert control to the FRONT of the toolbar (Tina renders
+      // the toolbar in this order; 'embed' only shows when `templates` exist).
+      toolbarOverride: ['embed', 'heading', 'link', 'image', 'quote', 'ul', 'ol', 'bold', 'italic', 'code', 'codeBlock', 'table'],
+    },
+  ],
+}
+```
+
+**2b. Navigation (optional)**: add a second collection over the same `content/docs`
+path, scoped to `meta.json`, to edit Fumadocs' sidebar (titles, ordering,
+separators, links) in the admin. It coexists with `docs` because the format +
+match differ. Editing is save-refresh (reorder `pages`, save, refresh the page):
+
+```ts
+{
+  name: 'meta', label: 'Navigation (meta.json)', path: 'content/docs',
+  format: 'json', match: { include: '**/meta' },
+  fields: [
+    { type: 'string', name: 'title' },
+    { type: 'boolean', name: 'defaultOpen' },
+    { type: 'boolean', name: 'root' },
+    { type: 'string', name: 'pagesIndex' },
+    {
+      type: 'string', name: 'pages', list: true,
+      description: '"slug"=page/folder · "..."=everything else (keep last) · "---Label---"=separator · "[Text](url)"=link · "!slug"=hide',
+    },
   ],
 }
 ```
