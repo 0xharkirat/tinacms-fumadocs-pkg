@@ -15,6 +15,8 @@ import {
   writeFileSync,
   mkdirSync,
   copyFileSync,
+  rmSync,
+  readdirSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,6 +98,41 @@ const DOCS_COLLECTION = `      {
           },
         ],
       },`;
+
+// Media folder for the Tina Media Manager. `tinacms init` ships mediaRoot:''
+// which scopes the manager to the public/ ROOT — where Tina's own admin build
+// (public/admin) lives, so that folder shows up in the manager next to real
+// images. Scoping media to a dedicated subfolder fixes that. 'uploads' is the
+// value in Tina's official docs example. Uploads now land in public/uploads/
+// and resolve as /uploads/… (see README / report for the tradeoff).
+const MEDIA_ROOT = 'uploads';
+
+// Tina's search config. Added to defineConfig (after `schema`) so /admin stops
+// showing the "you have not configured search" banner. The indexer token comes
+// from an env var (get it from tina.io); with it unset, search is simply
+// inactive and the banner stays gone.
+const SEARCH_BLOCK = `  search: {
+    tina: {
+      // Don't paste your search token here. Keep it in your .env file and read
+      // it from there (get the token from tina.io). Unset is fine for local dev
+      // and local builds; a cloud build with search enabled needs it set.
+      indexerToken: process.env.NEXT_PUBLIC_TINA_SEARCH_TOKEN,
+      stopwordLanguages: ['eng'],
+    },
+    indexBatchSize: 100,
+    maxSearchIndexFieldLength: 100,
+  },`;
+
+// `tinacms init` scaffolds this sample post (content/posts/hello-world.md). We
+// only delete it when it matches Tina's stock sample (its title + heading), never a
+// user's own file of the same name. Two cheap signatures (the frontmatter title
+// + the Lorem-ipsum body opener) are enough to fingerprint the stock file
+// without hard-coding the whole Lorem paragraph.
+const TINA_SAMPLE_POST = {
+  rel: 'content/posts/hello-world.md',
+  // both must be present for a match
+  signatures: ['title: Hello, World!', '## Hello World!'],
+};
 
 // ── tiny logger ────────────────────────────────────────────────────────────
 const step = (m) => console.log(`\n\x1b[1m• ${m}\x1b[0m`);
@@ -299,12 +336,47 @@ step('Gitignoring the Tina admin build (public/admin)');
   ok('added public/admin to .gitignore');
 })();
 
-// ── 7. tina/config.ts, the docs collection ────────────────────────────────
-// Replace Tina's sample collection with a Fumadocs `docs` collection. The
-// sample tina-init config is deterministic, so we add the import and rewrite
-// the contents of `collections: [ … ]` by bracket-matching. Anything unexpected
-// falls back to printing the block for a manual paste.
-step('Wiring the docs collection (tina/config.ts)');
+// ── 7. remove the tinacms sample post (safely) ─────────────────────────────
+// `tinacms init` drops a Lorem-ipsum content/posts/hello-world.md that has
+// nothing to do with a Fumadocs docs site. Delete it ONLY when it still matches
+// Tina's untouched sample; if the user has edited it (or owns a same-named
+// file), leave it alone. Idempotent: a missing file is a no-op.
+step('Removing the tinacms sample post (content/posts/hello-world.md)');
+(() => {
+  const postPath = join(CWD, TINA_SAMPLE_POST.rel);
+  if (!existsSync(postPath)) return ok('no sample post (already gone)');
+  let body = '';
+  try {
+    body = readFileSync(postPath, 'utf8');
+  } catch {
+    return warn(`could not read ${TINA_SAMPLE_POST.rel}, left it alone`);
+  }
+  const isStock = TINA_SAMPLE_POST.signatures.every((s) => body.includes(s));
+  if (!isStock) return warn(`${TINA_SAMPLE_POST.rel} looks edited, left it alone`);
+  try {
+    rmSync(postPath);
+    ok(`removed ${TINA_SAMPLE_POST.rel}`);
+    // tidy up: drop content/posts only if our delete left it empty
+    const postsDir = dirname(postPath);
+    if (existsSync(postsDir) && readdirSync(postsDir).length === 0) {
+      rmSync(postsDir, { recursive: true });
+      ok(`removed empty ${rel(postsDir)}`);
+    }
+  } catch {
+    warn(`could not remove ${TINA_SAMPLE_POST.rel}`);
+  }
+})();
+
+// ── 8. tina/config.ts: docs collection + media root + search ───────────────
+// Three edits to the deterministic tina-init config, all idempotent and all
+// written in one pass:
+//   a) replace Tina's sample collection with the Fumadocs docs+meta collections
+//      (add the import, bracket-match `collections: [ … ]`, rewrite its body)
+//   b) scope the Media Manager away from public/ root (mediaRoot '' -> 'uploads')
+//   c) add the search block to defineConfig (clears the /admin search banner)
+// Each sub-edit no-ops when its change is already present, so a re-run is safe.
+// (a) falls back to printing the block for a manual paste; (b)/(c) just warn.
+step('Wiring tina/config.ts (docs collection, media root, search)');
 let collectionWired = false;
 try {
   const f = join(CWD, 'tina', 'config.ts');
@@ -312,9 +384,12 @@ try {
     warn('no tina/config.ts, run `pnpm dlx @tinacms/cli init` first, then re-run');
   } else {
     let src = readFileSync(f, 'utf8');
+    let changed = false;
+
+    // (a) docs + meta collections ------------------------------------------------
     if (src.includes('fumadocsTemplates') || /["']content\/docs["']/.test(src)) {
       collectionWired = true;
-      ok('tina/config.ts already has the docs collection');
+      ok('docs collection already present');
     } else {
       const importLine = `import { fumadocsTemplates } from '${ADAPTER}/templates';\n`;
       src = /from\s+["']tinacms["'];?\n/.test(src)
@@ -336,17 +411,62 @@ try {
         warn('could not find the collections array, paste the docs collection below into tina/config.ts');
       } else {
         src = `${src.slice(0, open + 1)}\n${DOCS_COLLECTION}\n    ${src.slice(close)}`;
-        writeFileSync(f, src);
         collectionWired = true;
-        ok('added the docs collection (replaced the sample) in tina/config.ts');
+        changed = true;
+        ok('added the docs collection (replaced the sample)');
       }
     }
+
+    // (b) media root -> dedicated subfolder --------------------------------------
+    // Rewrite an empty mediaRoot (single or double quotes) to MEDIA_ROOT so the
+    // admin/ build folder stops showing up in the Media Manager.
+    if (/mediaRoot\s*:\s*["']uploads["']/.test(src)) {
+      ok(`mediaRoot already '${MEDIA_ROOT}'`);
+    } else if (/mediaRoot\s*:\s*["']{2}/.test(src)) {
+      src = src.replace(/mediaRoot\s*:\s*["']{2}/, `mediaRoot: '${MEDIA_ROOT}'`);
+      changed = true;
+      ok(`mediaRoot -> '${MEDIA_ROOT}' (uploads land in public/${MEDIA_ROOT}/)`);
+    } else {
+      warn(`couldn't set mediaRoot, set media.tina.mediaRoot to '${MEDIA_ROOT}' to keep public/admin out of the Media Manager`);
+    }
+
+    // (c) search block -----------------------------------------------------------
+    // Insert right after the top-level `schema: { … },` inside defineConfig.
+    if (/\bsearch\s*:/.test(src)) {
+      ok('search already configured');
+    } else {
+      // bracket-match the `schema: {` object, then splice SEARCH_BLOCK after its
+      // closing `}` (and the trailing comma, if any).
+      const si = src.search(/\bschema\s*:/);
+      const sOpen = si >= 0 ? src.indexOf('{', si) : -1;
+      let d = 0;
+      let sClose = -1;
+      for (let i = sOpen; sOpen >= 0 && i < src.length; i++) {
+        if (src[i] === '{') d++;
+        else if (src[i] === '}' && --d === 0) {
+          sClose = i;
+          break;
+        }
+      }
+      if (sClose < 0) {
+        warn('could not find the schema block, add the search config below to defineConfig');
+      } else {
+        // step past an optional comma after the schema object's closing brace
+        let after = sClose + 1;
+        if (src[after] === ',') after++;
+        src = `${src.slice(0, after)}\n${SEARCH_BLOCK}${src.slice(after)}`;
+        changed = true;
+        ok('added the search block (clears the /admin search banner)');
+      }
+    }
+
+    if (changed) writeFileSync(f, src);
   }
 } catch {
-  warn('could not edit tina/config.ts, paste the docs collection below');
+  warn('could not edit tina/config.ts, paste the docs collection + search config below');
 }
 
-// ── 8. components/mdx.tsx, make every Embed component renderable ──────────
+// ── 9. components/mdx.tsx, make every Embed component renderable ──────────
 // Fumadocs' default map omits Steps / Accordions / Files; spread our matching
 // components into getMDXComponents so inserted blocks render on the page.
 step('Wiring the render components (getMDXComponents)');
@@ -398,7 +518,7 @@ step('Scaffolding the navigation meta.json');
   }
 })();
 
-// ── 9. package.json, wrap the dev script with tinacms dev ──────────────────
+// ── 10. package.json, wrap the dev script with tinacms dev ─────────────────
 step('Wrapping the dev script (tinacms dev)');
 (() => {
   // re-read: step 1 (install) rewrote package.json with the new deps
@@ -423,8 +543,12 @@ if (!configWired) {
 if (!collectionWired) {
   console.log('\n  tina/config.ts, add the import at the top:');
   console.log(`    import { fumadocsTemplates } from '${ADAPTER}/templates';`);
-  console.log('  and put this collection inside schema.collections (replace the sample):');
+  console.log('  put this collection inside schema.collections (replace the sample):');
   console.log(DOCS_COLLECTION);
+  console.log("\n  set media.tina.mediaRoot to keep public/admin out of the Media Manager:");
+  console.log(`    mediaRoot: '${MEDIA_ROOT}',`);
+  console.log('  and add this search block to defineConfig (after schema) to clear the /admin banner:');
+  console.log(SEARCH_BLOCK);
 }
 if (!componentsWired) {
   console.log('\n  components/mdx.tsx, spread the render components:');
