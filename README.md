@@ -7,17 +7,64 @@
 
 ## Quick start
 
-```bash
-pnpm create fumadocs-app                              # 1. a Fumadocs site (pick "Next.js: Fumadocs MDX", then keep everything to default)
-cd your-app
-pnpm dlx @tinacms/cli@latest init                     # 2. add TinaCMS (pick "Other", then "PNPM", then keep everything to default)
-pnpm dlx github:0xharkirat/tinacms-fumadocs-pkg init  # 3. add this adapter (wires everything)
-pnpm dev                                              # 4. run it
-```
+> ⚠️ Use `pnpm`, not `npm`, because npm's strict peer resolution rejects the install.
 
-Open **http://localhost:3000/admin**, click a doc, and edit.
 
-> Use `pnpm dlx`, not `npx`, because npm's strict peer resolution rejects the install.
+  ### 1. Create a Fumadocs site
+
+  ```bash
+  pnpm create fumadocs-app
+  ```
+  
+  Choose Next.js: Fumadocs MDX, then keep all options at their defaults.
+
+  Move into the generated project:
+
+  ```bash
+  cd your-app
+  ```
+
+  ### 2. Configure build approvals (only for pnpm v11)
+
+  Before continuing, replace the generated contents of `pnpm-workspace.yaml` with:
+
+   ```yaml
+   allowBuilds:
+      esbuild: true # Required by Fumadocs MDX and TinaCMS for compilation
+      sharp: true # Required by Next.js image processing
+      better-sqlite3: true # Required by TinaCMS search indexing
+      core-js: false # Library still works; its postinstall only prints funding information
+   ```
+
+  Then complete the dependency installation:
+
+  ```bash
+  pnpm install
+  ```
+
+  pnpm 11 blocks dependency build scripts unless explicitly approved. Without this configuration, the Fumadocs or TinaCMS installation may fail with `ERR_PNPM_IGNORED_BUILDS`.
+
+  ### 3. Initialize TinaCMS
+
+  ```bash
+  pnpm dlx @tinacms/cli@latest init
+  ```
+
+  Choose `Other` as the framework, `PNPM` as the package manager, then keep the remaining options at their defaults.
+
+
+  ### 4. Install the Fumadocs adapter
+
+  ```bash
+  pnpm dlx github:0xharkirat/tinacms-fumadocs-pkg init
+  ```
+
+  ### 5. Start the development server
+
+   ```bash
+   pnpm dev
+   ```
+  Open http://localhost:3000/admin, select a document, and start editing.
 
 ## Supported components
 
