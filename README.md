@@ -1,5 +1,8 @@
 # tinacms-fumadocs-pkg
 
+> [!WARNING]
+> **Preview only, not suited for real production use yet.** Official support is coming to TinaCMS (on their [roadmap for v4.1](https://tina.io/roadmap)). For now, explore and prototype, and leave feedback or a 👍 in the [GitHub Discussion](https://github.com/tinacms/tinacms/discussions/6973).
+
 **Visual editing for [Fumadocs](https://fumadocs.dev).** Edit your docs in a clean UI and watch the real Fumadocs components update live as you type. Your `.mdx` files stay the source of truth.
 
 ## Quick start
