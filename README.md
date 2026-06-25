@@ -7,14 +7,14 @@
 ```bash
 pnpm create fumadocs-app                              # 1. a Fumadocs site (pick "Next.js: Fumadocs MDX", then keep everything to default)
 cd your-app
-pnpm dlx @tinacms/cli@latest init                     # 2. add TinaCMS - (pick "Other", then "PNPM", then keep everything to default
-pnpm dlx github:0xharkirat/tinacms-fumadocs-pkg init  # 3. add this adapter — wires everything
+pnpm dlx @tinacms/cli@latest init                     # 2. add TinaCMS (pick "Other", then "PNPM", then keep everything to default)
+pnpm dlx github:0xharkirat/tinacms-fumadocs-pkg init  # 3. add this adapter (wires everything)
 pnpm dev                                              # 4. run it
 ```
 
 Open **http://localhost:3000/admin**, click a doc, and edit.
 
-> Use `pnpm dlx`, not `npx` — npm's strict peer resolution rejects the install.
+> Use `pnpm dlx`, not `npx`, because npm's strict peer resolution rejects the install.
 
 ## Supported components
 
