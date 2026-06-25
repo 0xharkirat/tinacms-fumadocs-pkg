@@ -5,9 +5,9 @@
 ## Quick start
 
 ```bash
-pnpm create fumadocs-app                              # 1. a Fumadocs site (pick "Next.js: Fumadocs MDX")
+pnpm create fumadocs-app                              # 1. a Fumadocs site (pick "Next.js: Fumadocs MDX", then keep everything to default)
 cd your-app
-pnpm dlx @tinacms/cli@latest init                     # 2. add TinaCMS
+pnpm dlx @tinacms/cli@latest init                     # 2. add TinaCMS - (pick "Other", then "PNPM", then keep everything to default
 pnpm dlx github:0xharkirat/tinacms-fumadocs-pkg init  # 3. add this adapter — wires everything
 pnpm dev                                              # 4. run it
 ```
